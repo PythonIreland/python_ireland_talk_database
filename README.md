@@ -37,13 +37,14 @@ An example
 ## Technology Stack:
 This will be discussed and agred with the Python Ireland development team and updated. A suggested stack is:
 
-1. Flask
+1. Flask / FastAPI
 2. React JS frontend
 3. SQLAlchemy ORM
 4. SQLite DB
 5. Python typing
 6. pytest
 7. pylint
+8. GitHub Actions
 
 ## Project development constraints:
 In order to proceed with the collaborative development, on GitHub, the app structure must be completed first. A suggestion would be to create a fresh cookiecutter-flask instance, and begin from there.
