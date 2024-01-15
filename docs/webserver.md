@@ -15,6 +15,7 @@ python -m pip install -r requirements.txt
 
 ### Run the server:
 `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
+
 Starts the server on: http://192.168.1.30:8000/
 
 ## 2. Start frontend server:
@@ -27,11 +28,12 @@ npm install
 
 ### Run the server:
 `HOST=0.0.0.0 npm start`
+
 Starts the server on: http://192.168.1.30:3000/
 
 ## CORS errors:
 To remove Cross Origin Resource Sharing errors - I added a section in `backend/app/main.py`:
-You may need to add your IP address here until we can figure out a better solution.
+
 
 ```python 
 origins = [
@@ -50,3 +52,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 ```
+
+You may need to add your IP address here until we can figure out a better solution.
