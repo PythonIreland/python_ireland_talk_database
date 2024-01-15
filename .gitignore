@@ -1,3 +1,8 @@
+# Repo specific:
+backend/venv/
+frontend/node_modules/
+frontend/.env.development
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
