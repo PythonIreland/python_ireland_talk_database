@@ -1,7 +1,7 @@
 '''
     Sessionize API acraping here. 
 
-    created 28.01.2024 by bogdansharpy@gmail.com
+    created 28.01.2024 by bogdansharpy@gmail.com, updated 09.02.2024
 
     Needs bs4 to be installed: pip install bs4
 
@@ -39,8 +39,8 @@ class Sessionize:
     def __get_sessionize_event(self, event_id, event_name, type):
         url = f"https://sessionize.com/api/v2/{event_id}/view/{type}?under=True"
         csv_file_name = f"{event_name}_{type}.csv"
-        text_or_default = lambda el, default: el.text if el else default
         rows = []
+        headers = []
 
         try:
             response = requests.get(url)
@@ -48,61 +48,96 @@ class Sessionize:
             soup = BeautifulSoup(response.content, 'html.parser')
 
             if type == "Speakers":
-                rows.append(['id', 'name', 'tagline', 'bio', 'photo']) 
                 top_element = soup.find('ul', class_="sz-speakers--list")
                 if not top_element:
                     raise RuntimeError('Unexpected server response!')
+
                 for row in top_element.find_all('li', class_='sz-speaker'):
-                    id = row.get('data-speakerid', '')
-                    name = text_or_default(row.find('h3', class_='sz-speaker__name'), "")
-                    tagline = text_or_default(row.find('h4', class_='sz-speaker__tagline'), "")
-                    bio = text_or_default(row.find('p', class_='sz-speaker__bio'), "")
-                    bio = bio.replace('<br>', '\n')
-                    photo = ''
+                    csv_row = {}
+                    # id
+                    if row.has_attr('data-speakerid'):
+                        csv_row['id'] = row.get('data-speakerid', '').strip()
+                    # name
+                    name_el = row.find('h3', class_='sz-speaker__name')
+                    if name_el:
+                        csv_row['name'] = name_el.text.strip()
+                    # tagline    
+                    tagline_el = row.find('h4', class_='sz-speaker__tagline')
+                    if tagline_el:
+                        csv_row['tagline'] = tagline_el.text.strip()
+                    # bio
+                    bio_el = row.find('p', class_='sz-speaker__bio')
+                    if bio_el:
+                        csv_row['bio'] = bio_el.text.strip().replace('<br>', '\n')
+                    #photo
                     photo_el = row.find('div', class_='sz-speaker__photo')
                     if photo_el:
                         photo_img_el = photo_el.find('img')
-                        if photo_img_el:
-                            photo = photo_img_el.get('src', '')
-                    rows.append([id, name, tagline, bio, photo]) 
+                        if photo_img_el and photo_img_el.has_attr('src'):
+                            csv_row['photo'] = photo_img_el.get('src', '').strip()
+                    #
+                    rows.append(csv_row)
+
+                headers = ['id', 'name', 'tagline', 'bio', 'photo']
             
             elif type == "Sessions":
-                rows.append(['id', 'speaker_id', 'speaker', 'title', 'room_id', 'room', 'start_at', 'end_at', 'description']) 
+                max_speakers = 0
                 top_element = soup.find('ul', class_="sz-sessions--list")
                 if not top_element:
                     raise RuntimeError('Unexpected server response!')
+                    
                 for row in top_element.find_all('li', class_='sz-session'):
-                    id = row.get('data-sessionid', '')
-                    title = text_or_default(row.find('h3', class_='sz-session__title'), "")
-                    description = text_or_default(row.find('p', class_='sz-session__description'), "")
-                    description = description.replace('<br>', '\n')
-                    room, room_id = '', ''
+                    csv_row = {}
+                    # id
+                    if row.has_attr('data-sessionid'):
+                        csv_row['id'] = row.get('data-sessionid', '').strip()
+                    # title
+                    title_el = row.find('h3', class_='sz-session__title')
+                    if title_el:
+                        csv_row['title'] = title_el.text.strip()
+                    # description
+                    description_el = row.find('p', class_='sz-session__description')
+                    if description_el:
+                        csv_row['description'] = description_el.text.strip().replace('<br>', '\n')
+                    # room, room_id
                     room_el = row.find('div', class_='sz-session__room')
                     if room_el:
-                        room = room_el.text
-                        room_id = room_el.get('data-roomid', '')
+                        csv_row['room'] = room_el.text.strip()
+                        if room_el.has_attr('data-roomid'):
+                            csv_row['room_id'] = room_el.get('data-roomid', '').strip()
+                    # start_at, end_at
                     time_el = row.find('div', class_='sz-session__time')
-                    start_at, end_at = '', ''
                     if time_el:
                         time_str = time_el.get('data-sztz', '')
                         if time_str:
                             time_arr = time_str.split('|')
                             if len(time_arr) >= 3:
-                                start_at = time_arr[2]
+                                csv_row['start_at'] = time_arr[2].strip()
                             if len(time_arr) >= 4:
-                                end_at = time_arr[3]
-                    speaker_id, speaker = '', ''
+                                csv_row['end_at'] = time_arr[3].strip()
+                    # speakerN, speaker_idN
                     speakers_el = row.find('ul', class_='sz-session__speakers')
                     if speakers_el:
-                        for speaker_el in speakers_el.find_all('li'):
-                            speaker_id += ', ' if len(speaker_id) else ''
-                            speaker_id += speaker_el.get('data-speakerid', '')
-                            speaker += ', ' if len(speaker) else ''
-                            speaker += text_or_default(speaker_el.find('a'), "")
-                    rows.append([id, speaker_id, speaker, title, room_id, room, start_at, end_at, description]) 
+                        for i, speaker_el in enumerate(speakers_el.find_all('li')):
+                            max_speakers = max(max_speakers, i + 1)
+                            speaker_el_a = speaker_el.find('a')
+                            if speaker_el_a: 
+                                csv_row[f"speaker{i + 1}"] = speaker_el_a.text.strip()
+                            if speaker_el.has_attr('data-speakerid'):
+                                csv_row[f"speaker_id{i + 1}"] = speaker_el.get('data-speakerid', '').strip()
+                    # 
+                    rows.append(csv_row) 
+
+                headers = ['id']
+                for i in range(max_speakers):
+                    headers.append(f"speaker{i + 1}")
+                for i in range(max_speakers):
+                    headers.append(f"speaker_id{i + 1}")
+                headers += ['title', 'room_id', 'room', 'start_at', 'end_at', 'description']
 
             with open(csv_file_name, 'w', newline='', encoding='utf-8') as outf:
-                csvwriter = csv.writer(outf, delimiter =',')
+                csvwriter = csv.DictWriter(outf, delimiter =',', fieldnames=headers)
+                csvwriter.writeheader()
                 for row in rows:
                     csvwriter.writerow(row)
 
