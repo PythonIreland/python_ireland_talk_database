@@ -78,8 +78,8 @@ _Long‑term_, incorporate video data, extend this or add apps to integrate memb
 3. **Configure backend URL** (optional, defaults to http://localhost:8000):
    Create a .env:
    `bash
-    echo "VITE_BACKEND_URL=http://localhost:8000" > .env
-    `
+echo "VITE_BACKEND_URL=http://localhost:8000" > .env
+`
 4. **Run the development server**:
    ```bash
    npm run dev
@@ -96,20 +96,29 @@ Ingestion jobs to pull Meetup.com and Sessionize data into Postgres + Elasticsea
 
 # Architecture
 
-┌───────────────┐ ┌─────────────┐ ┌───────────────┐ ┌──────────────┐
-│ Ingest jobs │───▶──│ Data Lake │───▶──│ API Layer │───▶──│ Frontend │
-│ (Meetup, │ │ (Postgres, │ │ (GraphQL or │ │ (“Portal” / │
-│ Sessionize) │ │ JSONB, │ │ REST in Node)│ │ React app) │
-│ │ │ maybe ES) │ │ │ │ │
-└───────────────┘ └─────────────┘ └───────────────┘ └──────────────┘
-│ ▲ ▲ ▲
-│ │ └────────────┐ │
-│ │ │ │
-└─ future: embeddings └───▶ Vector DB │ │
-(Pinecone or │ │
-Elasticsearch) │ │
-└───▶ “Q&A Service” ─┘
+```mermaid
+flowchart LR
+  A["Ingest jobs<br/>(Meetup, Sessionize)"]
+  B["Data lake<br/>(Postgres, ES)"]
+  C["API layer<br/>(FastAPI REST/GraphQL)"]
+  D["Frontend<br/>(React + Vite)"]
 
-## LLM Integration (Future)
+  A --> B --> C --> D
+
+  %% future work
+  subgraph Future
+    direction LR
+    E["Embeddings<br/>Vector DB (Pinecone or ES)"]
+    F["Q&A Service"]
+    E --> F
+  end
+
+  %% link present to future
+  B --> E
+
+
+```
+
+### LLM Integration (Future)
 
 - **Goal:** Use LLMs to answer questions about the data, generate summaries, and provide insights.
