@@ -1,6 +1,14 @@
-import React, { FC } from 'react';
-import { Routes } from './Routes';
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import ExplorerPage from "./pages/ExplorerPage";
 
-const App: FC = () => <Routes />;
-
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/explorer" replace />} />
+        <Route path="/explorer" element={<ExplorerPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}

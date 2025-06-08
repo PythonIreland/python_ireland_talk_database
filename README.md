@@ -1,51 +1,124 @@
 # python_ireland_talk_database
-An application capable of creating a historical database for all Python Ireland talks. PyCon Ireland, Limerick and monthly meetups.
 
-# Python Ireland talks database:
+A modern “intelligence platform” for Python Ireland—aggregating all past talk and event metadata into a searchable, taggable, and analyzable system.
 
-## Project ideas:
-1. Create a searchable database of past Meetups.
-2. Create a searchable database of all PyCon talks & videos.
-3. Create a web application to display Meetup & PyCon meta data
+---
 
-## Introduction:
-For Python Ireland, we would like to create a historical database of each of the presentations given, at both our monthly meetups and PyCon Ireland and Limerick conferences.
-This data can then be used to help us make informed decisions about upcoming events, for example:
+## 🎯 Vision & Phases
 
-### Meetups:
-1. If we can find a venue who used to host us in the past - we can reach out and ask them to host us again.
-2. If we have had speakers for a given topic we would like to reach out to.
-3. See when was the last time we presented a given topic - when was the last "Python for beginners" type talk given?
+We’re building the first part in three iterative phases, with room to grow into a fuller information portal:
 
-### PyCons:
-1. See all talks by a given speaker.
-2. See all talks for a given subject.
-3. Decide to we have enough scope to split rooms into dedicated tracks, data science, AI, web dev, etc.
+### Phase A: Talk Content Explorer
 
-## Application structure:
-This will be discussed and agred with the Python Ireland development team and updated. A suggested structure is: https://github.com/cookiecutter-flask/cookiecutter-flask
+- **Goal:** Ingest Meetup & Sessionize data into Elasticsearch + Postgres, and build a React/Vite front‑end “Explorer”:
+  - Filter by date, platform, full‑text search of titles & descriptions
+  - Inline tagging of individual items
+  - Detail drawer for full metadata (speakers, links, etc.)
 
-The required application will need to be capable of 3 things:
-1. Scraping the Meetup API.
-2. Scraping PyCon Ireland data (Sessionize API?, Sessionize csv file?).
-3. Presenting the data in an easily digestible format.
+### Phase B: Taxonomy Manager
 
-For the above application we will use a templated web application (Flask or other framework) to house the main application #3, above. For items #1 and #2, above we will store the code in a relevant class object that can be called, standalone, from their own main.py type file.
+- **Goal:** Curate the raw tags into a structured hierarchy:
+  - Tag list with parent/child relationships
+  - Drag‑and‑drop tree builder
+  - Tag metadata (colors, descriptions, aliases)
+  - Saved tag sets for quick filtering
 
-An example 
+### Phase C: Analytics Dashboard
 
-## Technology Stack:
-This will be discussed and agred with the Python Ireland development team and updated. A suggested stack is:
+- **Goal:** Slice & dice tagged content with charts and exports:
+  - Tag distribution bar charts
+  - Trends over time (multi‑line charts)
+  - Co‑occurrence heatmaps
+  - CSV/JSON export and alerts on tag‑volume changes
 
-1. Flask / FastAPI
-2. React JS frontend
-3. SQLAlchemy ORM
-4. SQLite DB
-5. Python typing
-6. pytest
-7. pylint
-8. GitHub Actions
+_Long‑term_, incorporate video data, extend this or add apps to integrate member/sponsor/speaker data (CRM) data, build a Q&A interface (with LLMs), and eventually package this as a drop‑in portal for other Python communities. Also could build a data lake to take full ownership of content, fly to the moon, etc.
 
-## Project development constraints:
-In order to proceed with the collaborative development, on GitHub, the app structure must be completed first. A suggestion would be to create a fresh cookiecutter-flask instance, and begin from there.
-Once the app structure is in place, 2 files can be created, meetup_scraper.py and py_con_scraper.py, which will allow parallel development on the 3 main project tracks.
+---
+
+## 🛠 Technology Stack
+
+### Backend (Under Construction)
+
+- **Framework:** FastAPI
+- **Primary Store:** PostgreSQL (JSONB)
+- **Search & Analytics:** Elasticsearch
+- **ORM & Migrations:** SQLAlchemy + Alembic
+- **Auth:** OAuth2 / JWT
+
+### Frontend
+
+- **Build Tool:** Vite v6.3.5
+- **Library:** React v19.1.0 + TypeScript v5.8.3
+- **UI Components:** MUI v7.1.1 (`@mui/material`, `@mui/lab`, `@mui/icons-material`)
+- **Data Grid & Pickers:** `@mui/x-data-grid` v8.5.1, `@mui/x-date-pickers` v8.5.1
+- **Styling:** Emotion v11.14.0
+- **Charts:** Recharts v2.15.3
+- **Routing:** React Router v7.6.2
+- **Elasticsearch Client:** `@elastic/elasticsearch` (latest)
+- **Dates:** date-fns v4.1.0
+
+---
+
+## 📦 Frontend: Install & Run
+
+1. **Ensure Node 20+**:
+
+   ```bash
+   node --version   # should be 20.x
+
+   ```
+
+2. **Install dependencies**:
+
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+3. **Configure backend URL** (optional, defaults to http://localhost:8000):
+   Create a .env:
+   `bash
+echo "VITE_BACKEND_URL=http://localhost:8000" > .env
+`
+4. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
+   Open http://localhost:5173/explorer to see the skeleton Explorer page.
+
+## 🚧 Backend: Under Construction
+
+We’ll soon add:
+
+API endpoints in FastAPI for /explorer, /tags, /explorer/{id}, etc.
+
+Ingestion jobs to pull Meetup.com and Sessionize data into Postgres + Elasticsearch.
+
+# Architecture
+
+```mermaid
+flowchart LR
+  A["Ingest jobs<br/>(Meetup, Sessionize)"]
+  B["Data lake<br/>(Postgres, ES)"]
+  C["API layer<br/>(FastAPI REST/GraphQL)"]
+  D["Frontend<br/>(React + Vite)"]
+
+  A --> B --> C --> D
+
+  %% future work
+  subgraph Future
+    direction LR
+    E["Embeddings<br/>Vector DB (Pinecone or ES)"]
+    F["Q&A Service"]
+    E --> F
+  end
+
+  %% link present to future
+  B --> E
+
+
+```
+
+### LLM Integration (Future)
+
+- **Goal:** Use LLMs to answer questions about the data, generate summaries, and provide insights.
