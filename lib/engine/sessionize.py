@@ -1,157 +1,253 @@
-'''
-    Sessionize API acraping here. 
+"""
+Sessionize API scraper for Python Ireland Talk Database
 
-    created 28.01.2024 by bogdansharpy@gmail.com, updated 09.02.2024
+Uses publicly accessible Sessionize Embedding API: https://sessionize.com/playbook/embedding
+API Endpoint: https://sessionize.com/api/v2/{event_id}/view/{type}?under=True
+"""
 
-    Needs bs4 to be installed: pip install bs4
-
-    Uses publicly accessible Sessionize Embedding API : https://sessionize.com/playbook/embedding
-    API Endpoint:
-        f"https://sessionize.com/api/v2/{event_id}/view/{type}?under=True"
-        type in {"GridSmart", "SpeakerWall", "Speakers", "Sessions"}
-
-    Example of how to use script:
-        python sessionize.py --id amtv2kwb --name "PyCon 2022"
-
-    With no arguments by default will get this events: PyCon 2022, PyCon Limerick 2023, PyCon 2023
-
-'''
-
-import argparse
 import requests
-import csv
 from bs4 import BeautifulSoup
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Speaker:
+    id: str
+    name: str
+    tagline: str = ""
+    bio: str = ""
+    photo_url: str = ""
+
+
+@dataclass
+class Talk:
+    id: str
+    title: str
+    description: str = ""
+    room: str = ""
+    start_time: str = ""
+    end_time: str = ""
+    speakers: List[Speaker] = None
+    event_id: str = ""
+    event_name: str = ""
+
+    def __post_init__(self):
+        if self.speakers is None:
+            self.speakers = []
+
 
 class Sessionize:
-    def __init__(self, events=None) -> None:
-        default_events = { \
-            'amtv2kwb': 'PyCon 2022', \
-            'jb4vxosa': 'PyCon Limerick 2023', \
-            'jbshwhme': 'PyCon 2023', \
-        }
-        self.events = events if events else default_events
+    """Clean Sessionize API scraper"""
 
-    def get_sessionize_data(self):
+    DEFAULT_EVENTS = {
+        "amtv2kwb": "PyCon Ireland 2022",
+        "jb4vxosa": "PyCon Limerick 2023",
+        "jbshwhme": "PyCon Ireland 2023",
+    }
+
+    def __init__(self, events: Optional[Dict[str, str]] = None):
+        self.events = events or self.DEFAULT_EVENTS
+        self.session = requests.Session()
+        self.session.headers.update(
+            {"User-Agent": "Mozilla/5.0 (compatible; PythonIrelandTalkDB/1.0)"}
+        )
+
+    def get_all_data(self) -> List[Talk]:
+        """Get all talks with speaker information"""
+        all_talks = []
+
         for event_id, event_name in self.events.items():
-            for type in ("Sessions", "Speakers"):
-                self.__get_sessionize_event(event_id, event_name, type)
+            logger.info(f"Fetching data for {event_name} ({event_id})")
 
-    def __get_sessionize_event(self, event_id, event_name, type):
-        url = f"https://sessionize.com/api/v2/{event_id}/view/{type}?under=True"
-        csv_file_name = f"{event_name}_{type}.csv"
-        rows = []
-        headers = []
+            try:
+                # Get speakers first
+                speakers = self._get_speakers(event_id)
+                speaker_lookup = {speaker.id: speaker for speaker in speakers}
+
+                # Get sessions and match with speakers
+                talks = self._get_talks(event_id, event_name, speaker_lookup)
+                all_talks.extend(talks)
+
+            except Exception as e:
+                logger.error(f"Failed to fetch data for {event_name}: {e}")
+                continue
+
+        return all_talks
+
+    def _get_speakers(self, event_id: str) -> List[Speaker]:
+        """Fetch speakers for an event"""
+        url = f"https://sessionize.com/api/v2/{event_id}/view/Speakers?under=True"
 
         try:
-            response = requests.get(url)
+            response = self.session.get(url, timeout=10)
             response.raise_for_status()
-            soup = BeautifulSoup(response.content, 'html.parser')
+            soup = BeautifulSoup(response.content, "html.parser")
 
-            if type == "Speakers":
-                top_element = soup.find('ul', class_="sz-speakers--list")
-                if not top_element:
-                    raise RuntimeError('Unexpected server response!')
+            speakers_list = soup.find("ul", class_="sz-speakers--list")
+            if not speakers_list:
+                logger.warning(f"No speakers list found for event {event_id}")
+                return []
 
-                for row in top_element.find_all('li', class_='sz-speaker'):
-                    csv_row = {}
-                    # id
-                    if row.has_attr('data-speakerid'):
-                        csv_row['id'] = row.get('data-speakerid', '').strip()
-                    # name
-                    name_el = row.find('h3', class_='sz-speaker__name')
-                    if name_el:
-                        csv_row['name'] = name_el.text.strip()
-                    # tagline    
-                    tagline_el = row.find('h4', class_='sz-speaker__tagline')
-                    if tagline_el:
-                        csv_row['tagline'] = tagline_el.text.strip()
-                    # bio
-                    bio_el = row.find('p', class_='sz-speaker__bio')
-                    if bio_el:
-                        csv_row['bio'] = bio_el.text.strip().replace('<br>', '\n')
-                    #photo
-                    photo_el = row.find('div', class_='sz-speaker__photo')
-                    if photo_el:
-                        photo_img_el = photo_el.find('img')
-                        if photo_img_el and photo_img_el.has_attr('src'):
-                            csv_row['photo'] = photo_img_el.get('src', '').strip()
-                    #
-                    rows.append(csv_row)
+            speakers = []
+            for speaker_el in speakers_list.find_all("li", class_="sz-speaker"):
+                speaker = self._parse_speaker(speaker_el)
+                if speaker:
+                    speakers.append(speaker)
 
-                headers = ['id', 'name', 'tagline', 'bio', 'photo']
-            
-            elif type == "Sessions":
-                max_speakers = 0
-                top_element = soup.find('ul', class_="sz-sessions--list")
-                if not top_element:
-                    raise RuntimeError('Unexpected server response!')
-                    
-                for row in top_element.find_all('li', class_='sz-session'):
-                    csv_row = {}
-                    # id
-                    if row.has_attr('data-sessionid'):
-                        csv_row['id'] = row.get('data-sessionid', '').strip()
-                    # title
-                    title_el = row.find('h3', class_='sz-session__title')
-                    if title_el:
-                        csv_row['title'] = title_el.text.strip()
-                    # description
-                    description_el = row.find('p', class_='sz-session__description')
-                    if description_el:
-                        csv_row['description'] = description_el.text.strip().replace('<br>', '\n')
-                    # room, room_id
-                    room_el = row.find('div', class_='sz-session__room')
-                    if room_el:
-                        csv_row['room'] = room_el.text.strip()
-                        if room_el.has_attr('data-roomid'):
-                            csv_row['room_id'] = room_el.get('data-roomid', '').strip()
-                    # start_at, end_at
-                    time_el = row.find('div', class_='sz-session__time')
-                    if time_el:
-                        time_str = time_el.get('data-sztz', '')
-                        if time_str:
-                            time_arr = time_str.split('|')
-                            if len(time_arr) >= 3:
-                                csv_row['start_at'] = time_arr[2].strip()
-                            if len(time_arr) >= 4:
-                                csv_row['end_at'] = time_arr[3].strip()
-                    # speakerN, speaker_idN
-                    speakers_el = row.find('ul', class_='sz-session__speakers')
-                    if speakers_el:
-                        for i, speaker_el in enumerate(speakers_el.find_all('li')):
-                            max_speakers = max(max_speakers, i + 1)
-                            speaker_el_a = speaker_el.find('a')
-                            if speaker_el_a: 
-                                csv_row[f"speaker{i + 1}"] = speaker_el_a.text.strip()
-                            if speaker_el.has_attr('data-speakerid'):
-                                csv_row[f"speaker_id{i + 1}"] = speaker_el.get('data-speakerid', '').strip()
-                    # 
-                    rows.append(csv_row) 
+            logger.info(f"Found {len(speakers)} speakers for event {event_id}")
+            return speakers
 
-                headers = ['id']
-                for i in range(max_speakers):
-                    headers.append(f"speaker{i + 1}")
-                for i in range(max_speakers):
-                    headers.append(f"speaker_id{i + 1}")
-                headers += ['title', 'room_id', 'room', 'start_at', 'end_at', 'description']
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch speakers for {event_id}: {e}")
+            return []
 
-            with open(csv_file_name, 'w', newline='', encoding='utf-8') as outf:
-                csvwriter = csv.DictWriter(outf, delimiter =',', fieldnames=headers)
-                csvwriter.writeheader()
-                for row in rows:
-                    csvwriter.writerow(row)
+    def _parse_speaker(self, speaker_el) -> Optional[Speaker]:
+        """Parse a single speaker element"""
+        try:
+            speaker_id = speaker_el.get("data-speakerid", "").strip()
+            if not speaker_id:
+                return None
 
-        except requests.exceptions.RequestException as e:
-            print(f"Error: {e}")
+            name_el = speaker_el.find("h3", class_="sz-speaker__name")
+            name = name_el.text.strip() if name_el else ""
 
+            tagline_el = speaker_el.find("h4", class_="sz-speaker__tagline")
+            tagline = tagline_el.text.strip() if tagline_el else ""
+
+            bio_el = speaker_el.find("p", class_="sz-speaker__bio")
+            bio = bio_el.text.strip() if bio_el else ""
+
+            photo_el = speaker_el.find("div", class_="sz-speaker__photo")
+            photo_url = ""
+            if photo_el:
+                img_el = photo_el.find("img")
+                if img_el and img_el.get("src"):
+                    photo_url = img_el.get("src", "").strip()
+
+            return Speaker(
+                id=speaker_id, name=name, tagline=tagline, bio=bio, photo_url=photo_url
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to parse speaker: {e}")
+            return None
+
+    def _get_talks(
+        self, event_id: str, event_name: str, speaker_lookup: Dict[str, Speaker]
+    ) -> List[Talk]:
+        """Fetch talks for an event"""
+        url = f"https://sessionize.com/api/v2/{event_id}/view/Sessions?under=True"
+
+        try:
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, "html.parser")
+
+            sessions_list = soup.find("ul", class_="sz-sessions--list")
+            if not sessions_list:
+                logger.warning(f"No sessions list found for event {event_id}")
+                return []
+
+            talks = []
+            for session_el in sessions_list.find_all("li", class_="sz-session"):
+                talk = self._parse_talk(
+                    session_el, event_id, event_name, speaker_lookup
+                )
+                if talk:
+                    talks.append(talk)
+
+            logger.info(f"Found {len(talks)} talks for {event_name}")
+            return talks
+
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch talks for {event_id}: {e}")
+            return []
+
+    def _parse_talk(
+        self,
+        session_el,
+        event_id: str,
+        event_name: str,
+        speaker_lookup: Dict[str, Speaker],
+    ) -> Optional[Talk]:
+        """Parse a single session element"""
+        try:
+            session_id = session_el.get("data-sessionid", "").strip()
+            if not session_id:
+                return None
+
+            title_el = session_el.find("h3", class_="sz-session__title")
+            title = title_el.text.strip() if title_el else ""
+
+            description_el = session_el.find("p", class_="sz-session__description")
+            description = description_el.text.strip() if description_el else ""
+
+            room_el = session_el.find("div", class_="sz-session__room")
+            room = room_el.text.strip() if room_el else ""
+
+            # Parse time
+            start_time = end_time = ""
+            time_el = session_el.find("div", class_="sz-session__time")
+            if time_el:
+                time_str = time_el.get("data-sztz", "")
+                if time_str:
+                    time_parts = time_str.split("|")
+                    if len(time_parts) >= 3:
+                        start_time = time_parts[2].strip()
+                    if len(time_parts) >= 4:
+                        end_time = time_parts[3].strip()
+
+            # Parse speakers
+            speakers = []
+            speakers_el = session_el.find("ul", class_="sz-session__speakers")
+            if speakers_el:
+                for speaker_li in speakers_el.find_all("li"):
+                    speaker_id = speaker_li.get("data-speakerid", "").strip()
+                    if speaker_id and speaker_id in speaker_lookup:
+                        speakers.append(speaker_lookup[speaker_id])
+
+            return Talk(
+                id=session_id,
+                title=title,
+                description=description,
+                room=room,
+                start_time=start_time,
+                end_time=end_time,
+                speakers=speakers,
+                event_id=event_id,
+                event_name=event_name,
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to parse talk: {e}")
+            return None
+
+
+# For backward compatibility and testing
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process event id and name.')
-    parser.add_argument('--id', type=str, help='The event id', nargs='?')
-    parser.add_argument('--name', type=str, help='The group name', nargs='?')
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Fetch Sessionize data")
+    parser.add_argument("--event-id", type=str, help="Event ID")
+    parser.add_argument("--event-name", type=str, help="Event name")
+    parser.add_argument(
+        "--output", choices=["json", "csv"], default="json", help="Output format"
+    )
+
     args = parser.parse_args()
+
     events = None
-    if args.id:
-        events = { args.id: args.name if args.name else args.id }
-    sessionizeScraper = Sessionize(events=events)
-    sessionizeScraper.get_sessionize_data()
-    
+    if args.event_id:
+        events = {args.event_id: args.event_name or args.event_id}
+
+    scraper = Sessionize(events=events)
+    talks = scraper.get_all_data()
+
+    print(f"Found {len(talks)} talks")
+    for talk in talks[:3]:  # Show first 3
+        print(f"- {talk.title} by {', '.join(s.name for s in talk.speakers)}")

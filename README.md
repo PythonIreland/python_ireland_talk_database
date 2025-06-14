@@ -88,6 +88,15 @@ echo "VITE_BACKEND_URL=http://localhost:8000" > .env
 
 ## 🚧 Backend: Under Construction
 
+### Start Elasticsearch in Docker
+
+docker run -d \
+ --name elasticsearch \
+ -p 9200:9200 \
+ -e "discovery.type=single-node" \
+ -e "xpack.security.enabled=false" \
+ elasticsearch:8.11.0
+
 We’ll soon add:
 
 API endpoints in FastAPI for /explorer, /tags, /explorer/{id}, etc.
