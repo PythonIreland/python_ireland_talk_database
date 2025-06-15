@@ -86,19 +86,27 @@ echo "VITE_BACKEND_URL=http://localhost:8000" > .env
    ```
    Open http://localhost:5173/explorer to see the skeleton Explorer page.
 
-## 🚧 Backend: Under Construction
+## Backend:
 
 ### Start Elasticsearch in Docker
 
 #### Create the Elastisearch Docker network if you haven't already
 
 ```bash
+
+# May need to limit memory for local dev at least, elastic is very memory hungry
 docker run -d \
- --name elasticsearch \
- -p 9200:9200 \
- -e "discovery.type=single-node" \
- -e "xpack.security.enabled=false" \
- elasticsearch:8.11.0
+  --name elasticsearch \
+  -p 9200:9200 \
+  -e "discovery.type=single-node" \
+  -e "xpack.security.enabled=false" \
+  -e "ES_JAVA_OPTS=-Xms64m -Xmx128m" \
+  -e "bootstrap.memory_lock=false" \
+  -e "cluster.routing.allocation.disk.threshold_enabled=false" \
+  --memory=256m \
+  --memory-swap=256m \
+  --cpus="0.25" \
+  elasticsearch:8.11.0
 
 ```
 
@@ -111,24 +119,26 @@ curl http://localhost:9200/ #health check, should return a JSON response with cl
 
 ### Test the Data Retrieval Pipeline
 
+#### 1. Start Elasticsearch If not Running
+
 ````bash
 # lib/engine/elasticsearch_client.py - update README.md
 ## Test the Complete Pipeline
 
-### 1. Start Elasticsearch
+
 ```bash
 docker start elasticsearch
 curl http://localhost:9200/  # Health check
 ````
 
-### 2. Start FastAPI Backend
+#### 2. Start FastAPI Backend
 
 ```bash
 cd backend
 python run.py
 ```
 
-### 3. Test Endpoints
+### 3. Test Backend API & Frontend
 
 ```bash
 # Health check
@@ -149,6 +159,11 @@ curl "http://localhost:8000/api/v1/talks/search?q=django&talk_types=pycon&talk_t
 
 # Get available talk types
 curl http://localhost:8000/api/v1/talks/types
+
+# Run Frontend and browse talks in the Talk Explorer
+# NB - you must run data ingestion step above first
+cd frontend
+npm run dev # Open http://localhost:5173/explorer
 ```
 
 # Architecture
