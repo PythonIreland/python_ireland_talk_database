@@ -90,6 +90,9 @@ echo "VITE_BACKEND_URL=http://localhost:8000" > .env
 
 ### Start Elasticsearch in Docker
 
+#### Create the Elastisearch Docker network if you haven't already
+
+```bash
 docker run -d \
  --name elasticsearch \
  -p 9200:9200 \
@@ -97,11 +100,56 @@ docker run -d \
  -e "xpack.security.enabled=false" \
  elasticsearch:8.11.0
 
-We’ll soon add:
+```
 
-API endpoints in FastAPI for /explorer, /tags, /explorer/{id}, etc.
+#### Start Elasticsearch
 
-Ingestion jobs to pull Meetup.com and Sessionize data into Postgres + Elasticsearch.
+```bash
+docker start elasticsearch
+curl http://localhost:9200/ #health check, should return a JSON response with cluster info
+```
+
+### Test the Data Retrieval Pipeline
+
+````bash
+# lib/engine/elasticsearch_client.py - update README.md
+## Test the Complete Pipeline
+
+### 1. Start Elasticsearch
+```bash
+docker start elasticsearch
+curl http://localhost:9200/  # Health check
+````
+
+### 2. Start FastAPI Backend
+
+```bash
+cd backend
+python run.py
+```
+
+### 3. Test Endpoints
+
+```bash
+# Health check
+curl http://localhost:8000/api/v1/talks/health
+
+# Ingest all data (Sessionize + Meetup)
+curl -X POST http://localhost:8000/api/v1/talks/ingest
+
+# Search all talks
+curl http://localhost:8000/api/v1/talks/search
+
+# Filter by type
+curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon"
+curl "http://localhost:8000/api/v1/talks/search?talk_types=meetup"
+
+# Search with query
+curl "http://localhost:8000/api/v1/talks/search?q=django&talk_types=pycon&talk_types=meetup"
+
+# Get available talk types
+curl http://localhost:8000/api/v1/talks/types
+```
 
 # Architecture
 

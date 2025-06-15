@@ -1,76 +1,125 @@
-'''
-    Meetup API scraping here. 
-    
-    created 29.01.2024 by bogdansharpy@gmail.com, updated 09.02.2024
+"""
+Meetup API scraper for Python Ireland Talk Database
 
-    Uses publicly accessible Meetup GraphQL API to get information about Events: https://www.meetup.com/api/schema/#Event
-    API Endpoint: "https://api.meetup.com/gql"
+Uses Meetup GraphQL API to fetch event data
+API Endpoint: https://www.meetup.com/gql
+"""
 
-    Example of how to use script:
-        python meetup.py --group pythonireland
-
-    With no arguments by default will get events for group: "pythonireland"
-'''
-
-import argparse
 import requests
-import csv
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class MeetupVenue:
+    name: str = ""
+    city: str = ""
+    address: str = ""
+
+
+@dataclass
+class MeetupHost:
+    name: str = ""
+
+
+@dataclass
+class MeetupEvent:
+    id: str
+    title: str
+    description: str = ""
+    event_url: str = ""
+    start_time: str = ""
+    end_time: str = ""
+    going_count: int = 0
+    venue: Optional[MeetupVenue] = None
+    hosts: List[MeetupHost] = None
+    topics: List[str] = None
+    group_name: str = ""
+
+    def __post_init__(self):
+        if self.hosts is None:
+            self.hosts = []
+        if self.topics is None:
+            self.topics = []
+        if self.venue is None:
+            self.venue = MeetupVenue()
+
 
 class Meetup:
-    def __init__(self, group=None) -> None:
-        self.group = group if group else "pythonireland"
-        self.api_url = "https://api.meetup.com/gql" 
+    """Clean Meetup GraphQL API scraper"""
 
-    def get_meetup_data(self):
-        headers = {"Content-Type": "application/json"}
-        csv_file_name = f"{self.group}_meetups.csv"
-        payload = { "query": 
-            """
-            query ($urlname: String!) {
-                groupByUrlname(urlname: $urlname) {
-                    id
-                    name
-                    pastEvents(input: { first: 100500 }) {
-                        count
-                        pageInfo {
-                            hasNextPage
-                            hasPreviousPage
-                            startCursor
-                            endCursor
-                        }
-                        edges {
-                            node {
-                                id
-                                status
-                                token
-                                eventUrl
-                                title
-                                dateTime
-                                endTime
-                                description
-                                going
-                                eventType
-                                imageUrl
-                                venue {
-                                    name
-                                    city
-                                    address
-                                    postalCode
-                                    lat
-                                    lng
-                                }
-                                hosts {
-                                    id
-                                    name
-                                }
-                                topics {
-                                    count
-                                    edges {
-                                        node {
-                                            urlkey
-                                            name
-                                            id
-                                        }
+    DEFAULT_GROUPS = {
+        "pythonireland": "Python Ireland",
+        "dublin-python": "Dublin Python",
+        "cork-python-meetup": "Cork Python Meetup",
+    }
+
+    def __init__(self, groups: Optional[Dict[str, str]] = None):
+        self.groups = groups or self.DEFAULT_GROUPS
+        self.api_url = "https://www.meetup.com/gql"
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (compatible; PythonIrelandTalkDB/1.0)",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+        )
+
+    def get_all_data(self) -> List[MeetupEvent]:
+        """Get all events from all configured groups"""
+        all_events = []
+
+        for group_urlname, group_display_name in self.groups.items():
+            logger.info(f"Fetching events for {group_display_name} ({group_urlname})")
+
+            try:
+                events = self._get_group_events(group_urlname, group_display_name)
+                all_events.extend(events)
+                logger.info(f"Found {len(events)} events for {group_display_name}")
+
+            except Exception as e:
+                logger.error(f"Failed to fetch events for {group_display_name}: {e}")
+                continue
+
+        logger.info(f"Total events found: {len(all_events)}")
+        return all_events
+
+    def _get_group_events(
+        self, group_urlname: str, group_display_name: str
+    ) -> List[MeetupEvent]:
+        """Fetch events for a specific group"""
+        query = """
+        query ($urlname: String!) {
+            groupByUrlname(urlname: $urlname) {
+                id
+                name
+                pastEvents(input: { first: 100 }) {
+                    edges {
+                        node {
+                            id
+                            title
+                            dateTime
+                            endTime
+                            description
+                            going
+                            eventUrl
+                            venue {
+                                name
+                                city
+                                address
+                            }
+                            hosts {
+                                name
+                            }
+                            topics {
+                                edges {
+                                    node {
+                                        name
                                     }
                                 }
                             }
@@ -78,76 +127,126 @@ class Meetup:
                     }
                 }
             }
-            """,
-            "variables": { "urlname": self.group }
         }
-        events = []
+        """
+
+        payload = {"query": query, "variables": {"urlname": group_urlname}}
+
         try:
-            response = requests.post(self.api_url, json=payload, headers=headers)
-            if response.status_code == 200:
-                result = response.json()
-                if (not result) or ('data' not in result) or \
-                    ('groupByUrlname' not in result['data']) or \
-                    (not result['data']['groupByUrlname']):
-                    raise Exception(f"GraphQL empty result")
-                events = [event['node'] for event in result['data']['groupByUrlname']['pastEvents']['edges']]
-            else:
-                raise Exception(f"GraphQL request failed with status code {response.status_code}: {response.text}")
+            response = self.session.post(self.api_url, json=payload, timeout=30)
+            response.raise_for_status()
 
-            rows = []
-            max_hosts = 0
-            max_topics = 0
-            for e in events:
-                row = {}
-                if 'id' in e: row['id'] = e['id'].strip()
-                if 'status' in e: row['status'] = e['status'].strip()
-                if 'title' in e: row['title'] = e['title'].strip()
-                if 'eventUrl' in e: row['url'] = e['eventUrl'].strip()
-                if 'dateTime' in e: row['start_at'] = e['dateTime'].strip()
-                if 'endTime' in e: row['end_at'] = e['endTime'].strip()
-                if 'going' in e: row['going'] = e['going']  # int
-                if 'eventType' in e: row['eventType'] = e['eventType'].strip()
-                if 'venue' in e and e['venue']:
-                    venue = e['venue']
-                    if 'name' in venue: row['venue'] = venue['name'].strip()
-                    if 'city' in venue: row['city'] = venue['city'].strip()
-                    if 'address' in venue: row['address'] = venue['address'].strip()
-                    if 'postalCode' in venue: row['postalCode'] = venue['postalCode'].strip()
-                    if 'lat' in venue: row['lat'] = venue['lat']  # float
-                    if 'lng' in venue: row['lng'] = venue['lng']  # float
-                if e['hosts']: 
-                    hosts = [host['name'] for host in e['hosts']]
-                    max_hosts = max(max_hosts, len(hosts))
-                    for i, host in enumerate(hosts):
-                        row[f"host{i + 1}"] = host.strip()
-                if 'topics' in e and 'edges' in e['topics'] and e['topics']['edges']:
-                    topics = [topic['node'] for topic in e['topics']['edges']]
-                    max_topics = max(max_topics, len(topics))
-                    for i, topic in enumerate(topics):
-                        row[f"topic{i + 1}"] = topic['name'].strip()
-                if 'description' in e: row['description'] = e['description'].strip()
-                rows.append(row)
+            data = response.json()
 
-            headers = ['id', 'status', 'title', 'url', 'start_at', 'end_at', 'going', \
-                'eventType', 'venue', 'city', 'address', 'postalCode', 'lat', 'lng']
-            for i in range(max_hosts):
-                headers.append(f"host{i + 1}")
-            for i in range(max_topics):
-                headers.append(f"topic{i + 1}")
-            headers.append('description')
+            if "errors" in data:
+                logger.error(f"GraphQL errors for {group_urlname}: {data['errors']}")
+                return []
 
-            with open(csv_file_name, 'w', newline='', encoding='utf-8') as outf:
-                csvwriter = csv.DictWriter(outf, delimiter =',', fieldnames=headers)
-                csvwriter.writeheader()
-                for row in rows:
-                    csvwriter.writerow(row)
-            
+            if not data.get("data", {}).get("groupByUrlname"):
+                logger.warning(f"No group data found for {group_urlname}")
+                return []
+
+            events_data = data["data"]["groupByUrlname"]["pastEvents"]["edges"]
+            events = []
+
+            for edge in events_data:
+                event = self._parse_event(edge["node"], group_display_name)
+                if event:
+                    events.append(event)
+
+            return events
+
+        except requests.RequestException as e:
+            logger.error(f"HTTP request failed for {group_urlname}: {e}")
+            return []
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"Failed to parse response for {group_urlname}: {e}")
+            return []
 
+    def _parse_event(self, event_data: dict, group_name: str) -> Optional[MeetupEvent]:
+        """Parse a single event from GraphQL response"""
+        try:
+            event_id = event_data.get("id", "")
+            if not event_id:
+                return None
+
+            # Parse venue
+            venue_data = event_data.get("venue")
+            venue = MeetupVenue()
+            if venue_data:
+                venue = MeetupVenue(
+                    name=venue_data.get("name", ""),
+                    city=venue_data.get("city", ""),
+                    address=venue_data.get("address", ""),
+                )
+
+            # Parse hosts
+            hosts_data = event_data.get("hosts", [])
+            hosts = [MeetupHost(name=host.get("name", "")) for host in hosts_data]
+
+            # Parse topics
+            topics_data = event_data.get("topics", {}).get("edges", [])
+            topics = [
+                topic["node"]["name"]
+                for topic in topics_data
+                if topic.get("node", {}).get("name")
+            ]
+
+            # Clean description (remove HTML tags if present)
+            description = event_data.get("description", "")
+            if description:
+                # Basic HTML tag removal
+                import re
+
+                description = re.sub(r"<[^>]+>", "", description).strip()
+
+            return MeetupEvent(
+                id=event_id,
+                title=event_data.get("title", ""),
+                description=description,
+                event_url=event_data.get("eventUrl", ""),
+                start_time=event_data.get("dateTime", ""),
+                end_time=event_data.get("endTime", ""),
+                going_count=event_data.get("going", 0),
+                venue=venue,
+                hosts=hosts,
+                topics=topics,
+                group_name=group_name,
+            )
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to parse event {event_data.get('id', 'unknown')}: {e}"
+            )
+            return None
+
+
+# For testing and CLI usage
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process meetup group url.')
-    parser.add_argument('--group', type=str, help='The group url in meetup', default=None)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Fetch Meetup data")
+    parser.add_argument("--group", type=str, help="Meetup group URL name")
+    parser.add_argument(
+        "--output", choices=["json", "summary"], default="summary", help="Output format"
+    )
+
     args = parser.parse_args()
-    meetupScraper = Meetup(args.group)
-    meetupScraper.get_meetup_data()
+
+    groups = None
+    if args.group:
+        groups = {args.group: args.group}
+
+    scraper = Meetup(groups=groups)
+    events = scraper.get_all_data()
+
+    if args.output == "json":
+        import json
+
+        print(json.dumps([event.__dict__ for event in events], indent=2, default=str))
+    else:
+        print(f"Found {len(events)} events")
+        for event in events[:5]:  # Show first 5
+            print(
+                f"- {event.title} ({event.group_name}) - {len(event.hosts)} hosts, {event.going_count} attendees"
+            )

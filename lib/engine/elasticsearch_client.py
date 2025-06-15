@@ -6,20 +6,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# lib/engine/elasticsearch_client.py
-from elasticsearch import Elasticsearch
-
-
 class ElasticsearchClient:
+    # lib/engine/elasticsearch_client.py - fix the constructor
     def __init__(self, host: str = "localhost", port: int = 9200):
         self.host = host
         self.port = port
-        # Add compatibility headers for ES 8.x
-        self.es = Elasticsearch(
-            [f"http://{host}:{port}"],
-            verify_certs=False,
-            headers={"Accept": "application/vnd.elasticsearch+json; compatible-with=8"},
-        )
+        # Simple connection for ES 7.x client
+        self.es = Elasticsearch([f"http://{host}:{port}"])
 
     def is_healthy(self) -> bool:
         """Check if Elasticsearch is healthy"""
@@ -30,44 +23,50 @@ class ElasticsearchClient:
             logger.error(f"Elasticsearch health check failed: {e}")
             return False
 
+    # lib/engine/elasticsearch_client.py - update the mapping
     def create_talk_index(self) -> bool:
         """Create index for talk documents"""
         mapping = {
             "mappings": {
                 "properties": {
                     "id": {"type": "keyword"},
-                    "event_id": {"type": "keyword"},
-                    "event_name": {
-                        "type": "text",
-                        "fields": {"keyword": {"type": "keyword"}},
-                    },
+                    "talk_type": {"type": "keyword"},  # Add this field
                     "title": {
                         "type": "text",
                         "analyzer": "standard",
                         "fields": {"keyword": {"type": "keyword"}},
                     },
                     "description": {"type": "text", "analyzer": "standard"},
-                    "room": {"type": "keyword"},
-                    "start_time": {"type": "keyword"},
-                    "end_time": {"type": "keyword"},
                     "speaker_names": {
                         "type": "text",
                         "fields": {"keyword": {"type": "keyword"}},
                     },
+                    # PyConf specific fields
+                    "event_id": {"type": "keyword"},
+                    "event_name": {
+                        "type": "text",
+                        "fields": {"keyword": {"type": "keyword"}},
+                    },
+                    "room": {"type": "keyword"},
+                    "start_time": {"type": "keyword"},
+                    "end_time": {"type": "keyword"},
                     "speaker_bios": {"type": "text"},
                     "speaker_taglines": {"type": "text"},
                     "speaker_photos": {"type": "keyword"},
+                    # Meetup specific fields
+                    "meetup_id": {"type": "keyword"},
+                    "event_url": {"type": "keyword"},
+                    "venue_name": {"type": "text"},
+                    "venue_address": {"type": "text"},
+                    "city": {"type": "keyword"},
+                    "going_count": {"type": "integer"},
+                    "event_date": {"type": "keyword"},
+                    "hosts": {"type": "keyword"},
+                    "topics": {"type": "keyword"},
+                    "group_name": {"type": "keyword"},
+                    # Common fields
                     "auto_tags": {"type": "keyword"},
                     "manual_tags": {"type": "keyword"},
-                    "tags": {
-                        "type": "nested",
-                        "properties": {
-                            "category": {"type": "keyword"},
-                            "subcategory": {"type": "keyword"},
-                            "confidence": {"type": "float"},
-                            "user_added": {"type": "boolean"},
-                        },
-                    },
                     "created_at": {"type": "date"},
                     "updated_at": {"type": "date"},
                 }
