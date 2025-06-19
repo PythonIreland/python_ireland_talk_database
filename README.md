@@ -90,7 +90,7 @@ echo "VITE_BACKEND_URL=http://localhost:8000" > .env
 
 ### Start Elasticsearch in Docker
 
-#### Create the Elastisearch Docker network if you haven't already
+#### Create the Elasticsearch Docker network if you haven't already
 
 ```bash
 
