@@ -86,13 +86,87 @@ echo "VITE_BACKEND_URL=http://localhost:8000" > .env
    ```
    Open http://localhost:5173/explorer to see the skeleton Explorer page.
 
-## 🚧 Backend: Under Construction
+## Backend:
 
-We’ll soon add:
+### Start Elasticsearch in Docker
 
-API endpoints in FastAPI for /explorer, /tags, /explorer/{id}, etc.
+#### Create the Elasticsearch Docker network if you haven't already
 
-Ingestion jobs to pull Meetup.com and Sessionize data into Postgres + Elasticsearch.
+```bash
+
+# May need to limit memory for local dev at least, elastic is very memory hungry
+docker run -d \
+  --name elasticsearch \
+  -p 9200:9200 \
+  -e "discovery.type=single-node" \
+  -e "xpack.security.enabled=false" \
+  -e "ES_JAVA_OPTS=-Xms64m -Xmx128m" \
+  -e "bootstrap.memory_lock=false" \
+  -e "cluster.routing.allocation.disk.threshold_enabled=false" \
+  --memory=256m \
+  --memory-swap=256m \
+  --cpus="0.25" \
+  elasticsearch:8.11.0
+
+```
+
+#### Start Elasticsearch
+
+```bash
+docker start elasticsearch
+curl http://localhost:9200/ #health check, should return a JSON response with cluster info
+```
+
+### Test the Data Retrieval Pipeline
+
+#### 1. Start Elasticsearch If not Running
+
+````bash
+# lib/engine/elasticsearch_client.py - update README.md
+## Test the Complete Pipeline
+
+
+```bash
+docker start elasticsearch
+curl http://localhost:9200/  # Health check
+````
+
+#### 2. Start FastAPI Backend
+
+```bash
+pipenv install --dev # Install dependencies, just do once or when you expect changes
+pipenv shell # Activate the virtual environment
+cd backend
+python run.py
+```
+
+### 3. Test Backend API & Frontend
+
+```bash
+# Health check
+curl http://localhost:8000/api/v1/talks/health
+
+# Ingest all data (Sessionize + Meetup)
+curl -X POST http://localhost:8000/api/v1/talks/ingest
+
+# Search all talks
+curl http://localhost:8000/api/v1/talks/search
+
+# Filter by type
+curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon"
+curl "http://localhost:8000/api/v1/talks/search?talk_types=meetup"
+
+# Search with query
+curl "http://localhost:8000/api/v1/talks/search?q=django&talk_types=pycon&talk_types=meetup"
+
+# Get available talk types
+curl http://localhost:8000/api/v1/talks/types
+
+# Run Frontend and browse talks in the Talk Explorer
+# NB - you must run data ingestion step above first
+cd frontend
+npm run dev # Open http://localhost:5173/explorer
+```
 
 # Architecture
 
