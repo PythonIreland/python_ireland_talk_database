@@ -17,6 +17,7 @@ passlib = {extras = ["bcrypt"], version = "*"}
 python-jose = {extras = ["cryptography"], version = "*"}
 python-multipart = "*"
 elasticsearch = "==7.17.9"
+beautifulsoup4 = "*"
 
 [dev-packages]
 pytest = "*"
