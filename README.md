@@ -134,6 +134,8 @@ curl http://localhost:9200/  # Health check
 #### 2. Start FastAPI Backend
 
 ```bash
+pipenv install --dev # Install dependencies, just do once or when you expect changes
+pipenv shell # Activate the virtual environment
 cd backend
 python run.py
 ```
