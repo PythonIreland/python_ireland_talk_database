@@ -16,13 +16,16 @@ def main():
     }
 
     sessionize_scraper = Sessionize(events=pycon_events)
-    sessionize_scraper.get_sessionize_data()
+    data = sessionize_scraper.get_all_data()
 
-    print("Data fetched successfully! Check the CSV files in the current directory.")
-
-    # Let's also try to find more PyCon events by trying some common patterns
-    print("\nTrying to find more PyCon events...")
-    test_event_patterns()
+    print(f"Found {len(data)} talks across {len(pycon_events)} events.")
+    print("First Talk Details:")
+    if data:
+        first_talk = data[0]
+        print(f"Title: {first_talk.title}")
+        print(f"Speaker: {first_talk.speakers}")
+        print(f"Event: {first_talk.event_name}")
+        print(f"Description: {first_talk.description[:100]}...")
 
 
 def test_event_patterns():
