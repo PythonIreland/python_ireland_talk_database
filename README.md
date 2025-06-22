@@ -35,27 +35,89 @@ _Long‑term_, incorporate video data, extend this or add apps to integrate memb
 
 ---
 
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Docker** (for Elasticsearch)
+- **Node.js 20+** (for frontend)
+- **Python 3.11+** with Pipenv (for backend)
+
+### 1. Start Elasticsearch
+
+```bash
+# Start Elasticsearch with memory limits for local development
+docker run -d \
+  --name elasticsearch \
+  -p 9200:9200 \
+  -e "discovery.type=single-node" \
+  -e "xpack.security.enabled=false" \
+  -e "ES_JAVA_OPTS=-Xms256m -Xmx512m" \
+  --memory=768m \
+  --memory-swap=768m \
+  elasticsearch:8.11.0
+
+# Health check (may take 30+ seconds to start)
+curl http://localhost:9200/
+```
+
+### 2. Start Backend
+
+```bash
+# Install dependencies and activate environment
+pipenv install
+pipenv shell
+
+# Start FastAPI server
+cd backend
+python run.py
+```
+
+### 3. Load Data
+
+```bash
+# Ingest talks from Sessionize (PyCon events) and Meetup
+curl -X POST http://localhost:8000/api/v1/talks/ingest
+
+# Verify data loaded
+curl http://localhost:8000/api/v1/talks/search
+```
+
+### 4. Start Frontend
+
+```bash
+# In a new terminal
+cd frontend
+npm install
+npm run dev
+
+# Open http://localhost:5173/explorer
+```
+
+You should now see the Talk Explorer with searchable/filterable Python Ireland talk data!
+
+---
+
 ## 🛠 Technology Stack
 
-### Backend (Under Construction)
+**Backend:** FastAPI, Elasticsearch, Python 3.11  
+**Frontend:** React, Vite, Material-UI, TypeScript  
+**Data Sources:** Sessionize (PyCon events), Meetup API
 
-- **Framework:** FastAPI
-- **Primary Store:** PostgreSQL (JSONB)
-- **Search & Analytics:** Elasticsearch
-- **ORM & Migrations:** SQLAlchemy + Alembic
-- **Auth:** OAuth2 / JWT
+---
 
-### Frontend
+## 🔧 API Examples
 
-- **Build Tool:** Vite v6.3.5
-- **Library:** React v19.1.0 + TypeScript v5.8.3
-- **UI Components:** MUI v7.1.1 (`@mui/material`, `@mui/lab`, `@mui/icons-material`)
-- **Data Grid & Pickers:** `@mui/x-data-grid` v8.5.1, `@mui/x-date-pickers` v8.5.1
-- **Styling:** Emotion v11.14.0
-- **Charts:** Recharts v2.15.3
-- **Routing:** React Router v7.6.2
-- **Elasticsearch Client:** `@elastic/elasticsearch` (latest)
-- **Dates:** date-fns v4.1.0
+```bash
+# Search talks
+curl "http://localhost:8000/api/v1/talks/search?q=django"
+
+# Filter by platform
+curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon&talk_types=meetup"
+
+# Health check
+curl http://localhost:8000/api/v1/talks/health
+```
 
 ---
 
@@ -113,7 +175,7 @@ docker run -d \
 #### Start Elasticsearch
 
 ```bash
-docker start elasticsearch
+docker start elasticsearch #NB it can take a while to start up, e.g. 30 seconds
 curl http://localhost:9200/ #health check, should return a JSON response with cluster info
 ```
 
