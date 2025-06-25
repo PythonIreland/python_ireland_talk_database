@@ -45,6 +45,8 @@ _Long‑term_, incorporate video data, extend this or add apps to integrate memb
 
 ### 1. Start Elasticsearch
 
+You may need to play around with memory settings for your environment. There is also the option of a direct install on Linux.
+
 ```bash
 # Start Elasticsearch with memory limits for local development
 docker run -d \
@@ -126,7 +128,11 @@ curl http://localhost:8000/api/v1/talks/health
 1. **Ensure Node 20+**:
 
    ```bash
+   nvm install 20 # if you need to
+   nvm use 20
+   nvm alias default 20 #will keep it the active one between sessions
    node --version   # should be 20.x
+   
 
    ```
 
