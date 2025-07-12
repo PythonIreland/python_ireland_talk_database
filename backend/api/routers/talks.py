@@ -1,27 +1,30 @@
 # backend/api/routers/talks.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from models.talk import TalkSearch, TalkType
-from lib.engine.elasticsearch_client import ElasticsearchClient
+from services.talk_service import TalkService
 from typing import List, Optional
 
 router = APIRouter()
 
 
+# Dependency to get TalkService
+def get_talk_service() -> TalkService:
+    return TalkService()
+
+
 @router.get("/")
 async def get_talks(
-    talk_types: Optional[List[TalkType]] = Query(None), limit: int = 20, offset: int = 0
+    talk_types: Optional[List[TalkType]] = Query(None),
+    limit: int = 20,
+    offset: int = 0,
+    talk_service: TalkService = Depends(get_talk_service),
 ):
     """Get talks with optional type filtering"""
-    es_client = ElasticsearchClient()
-
-    query = {"query": {"match_all": {}}, "size": limit, "from": offset}
-
-    if talk_types:
-        query["query"] = {"terms": {"talk_type": [t.value for t in talk_types]}}
-
     try:
-        results = es_client.search_talks(query)
-        return {"talks": results, "total": len(results)}
+        talks, total = talk_service.search_talks(
+            talk_types=talk_types, limit=limit, offset=offset
+        )
+        return {"talks": talks, "total": total}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -31,50 +34,60 @@ async def search_talks(
     q: Optional[str] = None,
     talk_types: Optional[List[TalkType]] = Query(None),
     tags: Optional[str] = None,
+    events: Optional[str] = None,
+    cities: Optional[str] = None,
     limit: int = 20,
+    offset: int = 0,
+    talk_service: TalkService = Depends(get_talk_service),
 ):
     """Search talks with filters"""
-    es_client = ElasticsearchClient()
-
-    # Build query
-    query = {"query": {"bool": {"must": []}}, "size": limit}
-
-    if q:
-        query["query"]["bool"]["must"].append(
-            {
-                "multi_match": {
-                    "query": q,
-                    "fields": ["title^2", "description", "speaker_names"],
-                }
-            }
-        )
-
-    if talk_types:
-        query["query"]["bool"]["must"].append(
-            {"terms": {"talk_type": [t.value for t in talk_types]}}
-        )
-
-    if tags:
-        tag_list = tags.split(",")
-        query["query"]["bool"]["must"].append({"terms": {"auto_tags": tag_list}})
-
-    if not query["query"]["bool"]["must"]:
-        query = {"query": {"match_all": {}}, "size": limit}
-
     try:
-        results = es_client.search_talks(query)
-        return {"talks": results, "total": len(results)}
+        # Parse comma-separated values
+        tag_list = tags.split(",") if tags else None
+        event_list = events.split(",") if events else None
+        city_list = cities.split(",") if cities else None
+
+        talks, total = talk_service.search_talks(
+            query=q,
+            talk_types=talk_types,
+            tags=tag_list,
+            events=event_list,
+            cities=city_list,
+            limit=limit,
+            offset=offset,
+        )
+        return {"talks": talks, "total": total}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{talk_id}")
+async def get_talk(talk_id: str, talk_service: TalkService = Depends(get_talk_service)):
+    """Get a single talk by ID"""
+    try:
+        talk = talk_service.get_talk(talk_id)
+        if not talk:
+            raise HTTPException(status_code=404, detail="Talk not found")
+        return talk
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/ingest")
-async def ingest_all_data():
+async def ingest_all_data(talk_service: TalkService = Depends(get_talk_service)):
     """Ingest data from all sources"""
     try:
         from lib.engine.data_pipeline import DataPipeline
 
-        pipeline = DataPipeline()
+        # Initialize database if needed
+        talk_service.init_database()
+
+        # Initialize default taxonomies
+        talk_service.initialize_default_taxonomies()
+
+        pipeline = DataPipeline(talk_service=talk_service)
         results = pipeline.ingest_all_data()
 
         return {
@@ -87,23 +100,21 @@ async def ingest_all_data():
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
 
 
-# backend/api/routers/talks.py - add this endpoint
 @router.get("/health")
-async def health_check():
-    """Check if Elasticsearch is available"""
+async def health_check(talk_service: TalkService = Depends(get_talk_service)):
+    """Check if database is available"""
     try:
-        es_client = ElasticsearchClient()
-        if es_client.is_healthy():
-            talk_count = es_client.get_talk_count()
+        if talk_service.is_healthy():
+            talk_count = talk_service.get_talk_count()
             return {
                 "status": "healthy",
-                "elasticsearch": "connected",
+                "database": "connected",
                 "talk_count": talk_count,
             }
         else:
             return {
                 "status": "unhealthy",
-                "elasticsearch": "disconnected",
+                "database": "disconnected",
                 "talk_count": 0,
             }
     except Exception as e:
@@ -114,3 +125,54 @@ async def health_check():
 async def get_talk_types():
     """Get available talk types"""
     return {"types": [t.value for t in TalkType]}
+
+
+@router.get("/events")
+async def get_events(talk_service: TalkService = Depends(get_talk_service)):
+    """Get all event names"""
+    try:
+        events = talk_service.get_events()
+        return {"events": events}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tags")
+async def get_tags(talk_service: TalkService = Depends(get_talk_service)):
+    """Get all auto tags with counts"""
+    try:
+        tags = talk_service.get_tags()
+        return {"tags": tags}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Taxonomy management endpoints
+
+
+@router.get("/taxonomies")
+async def get_taxonomies(talk_service: TalkService = Depends(get_talk_service)):
+    """Get all taxonomies"""
+    try:
+        taxonomies = talk_service.get_taxonomies()
+        return {"taxonomies": taxonomies}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{talk_id}/tags")
+async def update_talk_tags(
+    talk_id: str,
+    taxonomy_value_ids: List[int],
+    talk_service: TalkService = Depends(get_talk_service),
+):
+    """Update manual tags for a talk"""
+    try:
+        success = talk_service.update_talk_tags(talk_id, taxonomy_value_ids)
+        if not success:
+            raise HTTPException(status_code=404, detail="Talk not found")
+        return {"message": "Tags updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
