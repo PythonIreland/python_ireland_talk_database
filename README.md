@@ -1,37 +1,8 @@
-# python_ireland_talk_database
+# Python Ireland Talk Database
 
-A modern “intelligence platform” for Python Ireland—aggregating all past talk and event metadata into a searchable, taggable, and analyzable system.
+A searchable database of Python Ireland conference talks and meetup events with intelligent tagging and filtering capabilities.
 
----
-
-## 🎯 Vision & Phases
-
-We’re building the first part in three iterative phases, with room to grow into a fuller information portal:
-
-### Phase A: Talk Content Explorer
-
-- **Goal:** Ingest Meetup & Sessionize data into Elasticsearch + Postgres, and build a React/Vite front‑end “Explorer”:
-  - Filter by date, platform, full‑text search of titles & descriptions
-  - Inline tagging of individual items
-  - Detail drawer for full metadata (speakers, links, etc.)
-
-### Phase B: Taxonomy Manager
-
-- **Goal:** Curate the raw tags into a structured hierarchy:
-  - Tag list with parent/child relationships
-  - Drag‑and‑drop tree builder
-  - Tag metadata (colors, descriptions, aliases)
-  - Saved tag sets for quick filtering
-
-### Phase C: Analytics Dashboard
-
-- **Goal:** Slice & dice tagged content with charts and exports:
-  - Tag distribution bar charts
-  - Trends over time (multi‑line charts)
-  - Co‑occurrence heatmaps
-  - CSV/JSON export and alerts on tag‑volume changes
-
-_Long‑term_, incorporate video data, extend this or add apps to integrate member/sponsor/speaker data (CRM) data, build a Q&A interface (with LLMs), and eventually package this as a drop‑in portal for other Python communities. Also could build a data lake to take full ownership of content, fly to the moon, etc.
+**🚀 Latest:** Migrated to PostgreSQL for enhanced tagging and simpler deployment!
 
 ---
 
@@ -39,34 +10,38 @@ _Long‑term_, incorporate video data, extend this or add apps to integrate memb
 
 ### Prerequisites
 
-- **Docker** (for Elasticsearch)
+- **PostgreSQL** (local install or Docker)
 - **Node.js 20+** (for frontend)
 - **Python 3.11+** with Pipenv (for backend)
 
-### 1. Start Elasticsearch
+### 1. Start PostgreSQL
 
 ```bash
-# Start Elasticsearch with memory limits for local development
+# Option A: Using Docker (recommended)
 docker run -d \
-  --name elasticsearch \
-  -p 9200:9200 \
-  -e "discovery.type=single-node" \
-  -e "xpack.security.enabled=false" \
-  -e "ES_JAVA_OPTS=-Xms256m -Xmx512m" \
-  --memory=768m \
-  --memory-swap=768m \
-  elasticsearch:8.11.0
+  --name postgres \
+  -p 5432:5432 \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=talks_db \
+  postgres:15
 
-# Health check (may take 30+ seconds to start)
-curl http://localhost:9200/
+# Option B: Using local PostgreSQL
+createdb talks_db
+
+# Option C: Using docker-compose
+docker-compose up postgres -d
 ```
 
-### 2. Start Backend
+### 2. Setup Backend
 
 ```bash
 # Install dependencies and activate environment
 pipenv install
 pipenv shell
+
+# Initialize PostgreSQL database and create tables
+python scripts/init_postgres.py
 
 # Start FastAPI server
 cd backend
@@ -81,6 +56,9 @@ curl -X POST http://localhost:8000/api/v1/talks/ingest
 
 # Verify data loaded
 curl http://localhost:8000/api/v1/talks/search
+
+# Check available taxonomies
+curl http://localhost:8000/api/v1/talks/taxonomies
 ```
 
 ### 4. Start Frontend
@@ -100,109 +78,54 @@ You should now see the Talk Explorer with searchable/filterable Python Ireland t
 
 ## 🛠 Technology Stack
 
-**Backend:** FastAPI, Elasticsearch, Python 3.11  
+**Backend:** FastAPI, PostgreSQL, Python 3.11  
 **Frontend:** React, Vite, Material-UI, TypeScript  
 **Data Sources:** Sessionize (PyCon events), Meetup API
 
 ---
 
-## 🔧 API Examples
+## 📦 Frontend Development
+
+### Prerequisites
+
+- **Node.js 20+**: `node --version` should show 20.x or higher
+
+### Setup
 
 ```bash
-# Search talks
+cd frontend
+npm install
+
+# Optional: Configure backend URL (defaults to http://localhost:8000)
+echo "VITE_BACKEND_URL=http://localhost:8000" > .env
+
+# Start development server
+npm run dev
+```
+
+Open http://localhost:5173/explorer to see the Talk Explorer!
+
+---
+
+## 🔧 Advanced Usage & Testing
+
+### API Examples
+
+```bash
+# Search talks by keyword
 curl "http://localhost:8000/api/v1/talks/search?q=django"
 
-# Filter by platform
+# Filter by talk type
 curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon&talk_types=meetup"
+
+# Get available taxonomies
+curl http://localhost:8000/api/v1/talks/taxonomies
 
 # Health check
 curl http://localhost:8000/api/v1/talks/health
 ```
 
----
-
-## 📦 Frontend: Install & Run
-
-1. **Ensure Node 20+**:
-
-   ```bash
-   node --version   # should be 20.x
-
-   ```
-
-2. **Install dependencies**:
-
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-3. **Configure backend URL** (optional, defaults to http://localhost:8000):
-   Create a .env:
-   `bash
-echo "VITE_BACKEND_URL=http://localhost:8000" > .env
-`
-4. **Run the development server**:
-   ```bash
-   npm run dev
-   ```
-   Open http://localhost:5173/explorer to see the skeleton Explorer page.
-
-## Backend:
-
-### Start Elasticsearch in Docker
-
-#### Create the Elasticsearch Docker network if you haven't already
-
-```bash
-
-# May need to limit memory for local dev at least, elastic is very memory hungry
-docker run -d \
-  --name elasticsearch \
-  -p 9200:9200 \
-  -e "discovery.type=single-node" \
-  -e "xpack.security.enabled=false" \
-  -e "ES_JAVA_OPTS=-Xms64m -Xmx128m" \
-  -e "bootstrap.memory_lock=false" \
-  -e "cluster.routing.allocation.disk.threshold_enabled=false" \
-  --memory=256m \
-  --memory-swap=256m \
-  --cpus="0.25" \
-  elasticsearch:8.11.0
-
-```
-
-#### Start Elasticsearch
-
-```bash
-docker start elasticsearch #NB it can take a while to start up, e.g. 30 seconds
-curl http://localhost:9200/ #health check, should return a JSON response with cluster info
-```
-
-### Test the Data Retrieval Pipeline
-
-#### 1. Start Elasticsearch If not Running
-
-````bash
-# lib/engine/elasticsearch_client.py - update README.md
-## Test the Complete Pipeline
-
-
-```bash
-docker start elasticsearch
-curl http://localhost:9200/  # Health check
-````
-
-#### 2. Start FastAPI Backend
-
-```bash
-pipenv install --dev # Install dependencies, just do once or when you expect changes
-pipenv shell # Activate the virtual environment
-cd backend
-python run.py
-```
-
-### 3. Test Backend API & Frontend
+### Complete Pipeline Test
 
 ```bash
 # Health check
@@ -211,50 +134,92 @@ curl http://localhost:8000/api/v1/talks/health
 # Ingest all data (Sessionize + Meetup)
 curl -X POST http://localhost:8000/api/v1/talks/ingest
 
-# Search all talks
+# Search and filter
 curl http://localhost:8000/api/v1/talks/search
-
-# Filter by type
 curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon"
-curl "http://localhost:8000/api/v1/talks/search?talk_types=meetup"
-
-# Search with query
-curl "http://localhost:8000/api/v1/talks/search?q=django&talk_types=pycon&talk_types=meetup"
-
-# Get available talk types
-curl http://localhost:8000/api/v1/talks/types
-
-# Run Frontend and browse talks in the Talk Explorer
-# NB - you must run data ingestion step above first
-cd frontend
-npm run dev # Open http://localhost:5173/explorer
+curl "http://localhost:8000/api/v1/talks/search?q=django"
 ```
 
-# Architecture
+### Development Commands
+
+```bash
+# Run tests
+bash scripts/test_postgres.sh
+
+# Reset database (careful!)
+python scripts/init_postgres.py
+```
+
+---
+
+## 🎯 Project Vision & Roadmap
+
+This project aims to become a comprehensive "intelligence platform" for Python Ireland, built in iterative phases:
+
+### Phase A: Talk Content Explorer ✅
+
+- **Current Status:** Complete with PostgreSQL migration
+- **Features:** Search, filter, and tag conference talks and meetup events
+- **Data Sources:** Sessionize (PyCon events) and Meetup API
+- **Interface:** React-based Talk Explorer with detail drawers
+
+### Phase B: Taxonomy Manager 🚧
+
+- **Goal:** Structured tag management and hierarchy
+- **Features:**
+  - User-defined taxonomies with custom values
+  - Tag metadata (colors, descriptions)
+  - Multiple taxonomy support per talk
+  - Drag-and-drop taxonomy builder
+
+### Phase C: Analytics Dashboard 📋
+
+- **Goal:** Data visualization and insights
+- **Features:**
+  - Tag distribution charts
+  - Trends over time
+  - Co-occurrence analysis
+  - CSV/JSON export capabilities
+
+### Future Vision 🚀
+
+- **LLM Integration:** Q&A interface for talk content
+- **Video Processing:** Automated transcription and tagging
+- **Community Portal:** Speaker profiles, event management
+- **Multi-Community:** Template for other Python communities
+
+---
+
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
-  A["Ingest jobs<br/>(Meetup, Sessionize)"]
-  B["Data lake<br/>(Postgres, ES)"]
-  C["API layer<br/>(FastAPI REST/GraphQL)"]
-  D["Frontend<br/>(React + Vite)"]
+  A["Data Sources<br/>(Meetup, Sessionize)"]
+  B["PostgreSQL<br/>(Storage & Search)"]
+  C["FastAPI<br/>(REST API)"]
+  D["React + Vite<br/>(Frontend)"]
 
   A --> B --> C --> D
 
-  %% future work
-  subgraph Future
-    direction LR
-    E["Embeddings<br/>Vector DB (Pinecone or ES)"]
-    F["Q&A Service"]
+  subgraph "Future"
+    E["Vector DB<br/>(Embeddings)"]
+    F["LLM Services<br/>(Q&A)"]
     E --> F
   end
 
-  %% link present to future
   B --> E
-
-
 ```
 
-### LLM Integration (Future)
+### Concentric Rings Pattern
 
-- **Goal:** Use LLMs to answer questions about the data, generate summaries, and provide insights.
+- **Ring 1:** Pure Python business logic (`lib/engine/`)
+- **Ring 2:** Database/API layer (`backend/database/`, `backend/services/`)
+- **Ring 3:** Frontend React application (`frontend/`)
+
+---
+
+## 📚 Documentation
+
+- **[Migration Guide](MIGRATION.md):** Detailed documentation of the Elasticsearch → PostgreSQL migration
+- **[API Documentation](http://localhost:8000/docs):** Interactive API docs (when backend is running)
+- **[Frontend README](frontend/README.md):** Frontend-specific setup and development notes
