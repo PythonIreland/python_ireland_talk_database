@@ -252,3 +252,79 @@ class TalkService:
     def get_most_popular_tags(self, limit: int = 20) -> List[Dict[str, Any]]:
         """Get most used tags across all taxonomies"""
         return self.db.get_most_popular_tags(limit)
+
+    # ===== PHASE 2: ENHANCED SERVICE LAYER METHODS =====
+
+    def get_taxonomy_value_counts(self, taxonomy_id: int) -> List[Dict[str, Any]]:
+        """Get usage counts for values in a specific taxonomy"""
+        return self.db.get_taxonomy_value_counts(taxonomy_id)
+
+    def bulk_update_talk_tags(self, operations: List[Dict]) -> bool:
+        """Perform bulk tag operations for efficiency
+
+        Expected operation format:
+        {
+            "action": "add|remove|replace",
+            "talk_id": "talk_id",
+            "taxonomy_value_ids": [1, 2, 3],  # for add/replace
+            "taxonomy_value_id": 1  # for remove (single)
+        }
+        """
+        try:
+            success_count = 0
+            for operation in operations:
+                action = operation.get("action")
+                talk_id = operation.get("talk_id")
+
+                if action == "add":
+                    taxonomy_value_ids = operation.get("taxonomy_value_ids", [])
+                    if self.add_tags_to_talk(talk_id, taxonomy_value_ids):
+                        success_count += 1
+
+                elif action == "remove":
+                    taxonomy_value_id = operation.get("taxonomy_value_id")
+                    if taxonomy_value_id and self.remove_tag_from_talk(
+                        talk_id, taxonomy_value_id
+                    ):
+                        success_count += 1
+
+                elif action == "replace":
+                    taxonomy_value_ids = operation.get("taxonomy_value_ids", [])
+                    if self.replace_talk_tags(talk_id, taxonomy_value_ids):
+                        success_count += 1
+
+            # Return True if all operations succeeded
+            return success_count == len(operations)
+
+        except Exception as e:
+            print(f"Bulk operation failed: {e}")
+            return False
+
+    def advanced_search_talks(
+        self,
+        query: Optional[str] = None,
+        talk_types: Optional[List[str]] = None,
+        taxonomy_filters: Optional[Dict[str, List[str]]] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[Dict], int]:
+        """Advanced search with taxonomy-based filtering
+
+        Args:
+            query: Text search query
+            talk_types: Filter by talk types
+            taxonomy_filters: Dict of taxonomy_name -> [values] filters
+                e.g., {"difficulty": ["beginner"], "topic": ["web-development", "ai-ml"]}
+            limit: Number of results
+            offset: Pagination offset
+
+        Returns:
+            Tuple of (talks, total_count)
+        """
+        return self.db.advanced_search_talks(
+            query=query,
+            talk_types=talk_types,
+            taxonomy_filters=taxonomy_filters or {},
+            limit=limit,
+            offset=offset,
+        )

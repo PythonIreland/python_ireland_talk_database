@@ -11,7 +11,7 @@ from backend.domain.models import (
     ReplaceTalkTagsRequest,
 )
 from backend.services.talk_service import TalkService
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 router = APIRouter()
 
@@ -350,6 +350,135 @@ async def remove_tag_from_talk(
         if not success:
             raise HTTPException(status_code=404, detail="Talk or tag not found")
         return {"message": "Tag removed successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== PHASE 2: ENHANCED SERVICE LAYER FEATURES =====
+
+
+# Analytics endpoints
+@router.get("/analytics/taxonomy-usage")
+async def get_taxonomy_usage_analytics(
+    talk_service: TalkService = Depends(get_talk_service),
+):
+    """Get usage statistics for all taxonomies"""
+    try:
+        stats = talk_service.get_taxonomy_usage_stats()
+        return {"analytics": stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analytics/popular-tags")
+async def get_popular_tags(
+    limit: int = Query(20, description="Number of tags to return"),
+    talk_service: TalkService = Depends(get_talk_service),
+):
+    """Get most popular tags across all taxonomies"""
+    try:
+        tags = talk_service.get_most_popular_tags(limit=limit)
+        return {"popular_tags": tags}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analytics/taxonomy/{taxonomy_id}/usage")
+async def get_taxonomy_value_usage(
+    taxonomy_id: int, talk_service: TalkService = Depends(get_talk_service)
+):
+    """Get usage statistics for values in a specific taxonomy"""
+    try:
+        stats = talk_service.get_taxonomy_value_counts(taxonomy_id)
+        return {"taxonomy_id": taxonomy_id, "value_usage": stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Bulk operations endpoints
+@router.post("/bulk/tag-operations")
+async def bulk_tag_operations(
+    operations: List[Dict], talk_service: TalkService = Depends(get_talk_service)
+):
+    """Perform bulk tag operations for efficiency
+
+    Example operations:
+    [
+        {"action": "add", "talk_id": "talk1", "taxonomy_value_ids": [1, 2]},
+        {"action": "remove", "talk_id": "talk2", "taxonomy_value_id": 3},
+        {"action": "replace", "talk_id": "talk3", "taxonomy_value_ids": [4, 5]}
+    ]
+    """
+    try:
+        success = talk_service.bulk_update_talk_tags(operations)
+        if not success:
+            raise HTTPException(status_code=400, detail="Some operations failed")
+        return {"message": f"Successfully processed {len(operations)} operations"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Enhanced search with taxonomy filtering
+@router.get("/search/advanced")
+async def advanced_search_talks(
+    q: Optional[str] = Query(None, description="Text search query"),
+    talk_types: Optional[List[TalkType]] = Query(
+        None, description="Filter by talk types"
+    ),
+    taxonomy_filters: Optional[str] = Query(
+        None, description="JSON string of taxonomy filters"
+    ),
+    difficulty: Optional[List[str]] = Query(
+        None, description="Filter by difficulty levels"
+    ),
+    topics: Optional[List[str]] = Query(None, description="Filter by topic areas"),
+    conferences: Optional[List[str]] = Query(None, description="Filter by conferences"),
+    limit: int = Query(20, description="Number of results to return"),
+    offset: int = Query(0, description="Offset for pagination"),
+    talk_service: TalkService = Depends(get_talk_service),
+):
+    """Advanced search with taxonomy-based filtering"""
+    try:
+        import json
+
+        # Parse taxonomy filters if provided
+        parsed_filters = {}
+        if taxonomy_filters:
+            try:
+                parsed_filters = json.loads(taxonomy_filters)
+            except json.JSONDecodeError:
+                raise HTTPException(
+                    status_code=400, detail="Invalid taxonomy_filters JSON"
+                )
+
+        # Build taxonomy filters from individual parameters
+        if difficulty:
+            parsed_filters["difficulty"] = difficulty
+        if topics:
+            parsed_filters["topic"] = topics
+        if conferences:
+            parsed_filters["conference"] = conferences
+
+        talks, total = talk_service.advanced_search_talks(
+            query=q,
+            talk_types=talk_types,
+            taxonomy_filters=parsed_filters,
+            limit=limit,
+            offset=offset,
+        )
+
+        return {
+            "talks": talks,
+            "total": total,
+            "applied_filters": {
+                "query": q,
+                "talk_types": talk_types,
+                "taxonomy_filters": parsed_filters,
+                "pagination": {"limit": limit, "offset": offset},
+            },
+        }
     except HTTPException:
         raise
     except Exception as e:

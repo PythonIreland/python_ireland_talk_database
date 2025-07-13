@@ -621,3 +621,118 @@ class PostgresClient:
             except SQLAlchemyError as e:
                 logger.error(f"Failed to get most popular tags: {e}")
                 return []
+
+    # ===== PHASE 2: ENHANCED DATABASE METHODS =====
+
+    def get_taxonomy_value_counts(self, taxonomy_id: int) -> List[Dict[str, Any]]:
+        """Get usage counts for values in a specific taxonomy"""
+        with self.get_session() as session:
+            try:
+                from sqlalchemy import func
+
+                value_counts = (
+                    session.query(
+                        TaxonomyValue.id,
+                        TaxonomyValue.value,
+                        TaxonomyValue.description,
+                        TaxonomyValue.color,
+                        func.count(talk_taxonomy_values.c.talk_id).label("usage_count"),
+                    )
+                    .outerjoin(
+                        talk_taxonomy_values,
+                        TaxonomyValue.id == talk_taxonomy_values.c.taxonomy_value_id,
+                    )
+                    .filter(TaxonomyValue.taxonomy_id == taxonomy_id)
+                    .group_by(
+                        TaxonomyValue.id,
+                        TaxonomyValue.value,
+                        TaxonomyValue.description,
+                        TaxonomyValue.color,
+                    )
+                    .order_by(func.count(talk_taxonomy_values.c.talk_id).desc())
+                    .all()
+                )
+
+                return [
+                    {
+                        "value_id": value.id,
+                        "value": value.value,
+                        "description": value.description,
+                        "color": value.color,
+                        "usage_count": value.usage_count,
+                    }
+                    for value in value_counts
+                ]
+            except SQLAlchemyError as e:
+                logger.error(f"Failed to get taxonomy value counts: {e}")
+                return []
+
+    def advanced_search_talks(
+        self,
+        query: Optional[str] = None,
+        talk_types: Optional[List[str]] = None,
+        taxonomy_filters: Optional[Dict[str, List[str]]] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[Dict], int]:
+        """Advanced search with taxonomy-based filtering"""
+        with self.get_session() as session:
+            try:
+                from sqlalchemy import and_, or_, func, text
+
+                # Base query
+                query_obj = session.query(Talk)
+
+                # Text search
+                if query:
+                    search_filter = or_(
+                        Talk.title.ilike(f"%{query}%"),
+                        Talk.description.ilike(f"%{query}%"),
+                        func.array_to_string(Talk.speaker_names, " ").ilike(
+                            f"%{query}%"
+                        ),
+                    )
+                    query_obj = query_obj.filter(search_filter)
+
+                # Talk type filtering
+                if talk_types:
+                    query_obj = query_obj.filter(Talk.talk_type.in_(talk_types))
+
+                # Taxonomy-based filtering
+                if taxonomy_filters:
+                    for taxonomy_name, values in taxonomy_filters.items():
+                        if values:  # Only apply filter if values are provided
+                            # Subquery for talks that have at least one of the specified values
+                            subquery = (
+                                session.query(talk_taxonomy_values.c.talk_id)
+                                .join(
+                                    TaxonomyValue,
+                                    TaxonomyValue.id
+                                    == talk_taxonomy_values.c.taxonomy_value_id,
+                                )
+                                .join(
+                                    Taxonomy, Taxonomy.id == TaxonomyValue.taxonomy_id
+                                )
+                                .filter(
+                                    and_(
+                                        Taxonomy.name == taxonomy_name,
+                                        TaxonomyValue.value.in_(values),
+                                    )
+                                )
+                                .distinct()
+                            )
+
+                            query_obj = query_obj.filter(Talk.id.in_(subquery))
+
+                # Get total count before pagination
+                total_count = query_obj.count()
+
+                # Apply pagination
+                talks = query_obj.offset(offset).limit(limit).all()
+
+                # Convert to dictionaries
+                return [talk.to_dict() for talk in talks], total_count
+
+            except SQLAlchemyError as e:
+                logger.error(f"Failed to perform advanced search: {e}")
+                return [], 0
