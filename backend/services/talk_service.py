@@ -202,3 +202,53 @@ class TalkService:
                     )
 
         logger.info("Default taxonomies initialized")
+
+    def update_taxonomy(
+        self, taxonomy_id: int, name: str = None, description: str = None
+    ) -> bool:
+        """Update taxonomy"""
+        return self.db.update_taxonomy(taxonomy_id, name=name, description=description)
+
+    def delete_taxonomy(self, taxonomy_id: int) -> bool:
+        """Delete taxonomy and all its values"""
+        return self.db.delete_taxonomy(taxonomy_id)
+
+    def update_taxonomy_value(
+        self,
+        value_id: int,
+        value: str = None,
+        description: str = None,
+        color: str = None,
+    ) -> bool:
+        """Update taxonomy value"""
+        return self.db.update_taxonomy_value(
+            value_id, value=value, description=description, color=color
+        )
+
+    def delete_taxonomy_value(self, value_id: int) -> bool:
+        """Delete taxonomy value"""
+        return self.db.delete_taxonomy_value(value_id)
+
+    def get_talk_tags_grouped(self, talk_id: str) -> Optional[Dict[str, Any]]:
+        """Get talk tags grouped by taxonomy"""
+        return self.db.get_talk_tags_with_taxonomy_info(talk_id)
+
+    def replace_talk_tags(self, talk_id: str, taxonomy_value_ids: List[int]) -> bool:
+        """Replace all manual tags for a talk"""
+        return self.db.replace_talk_tags(talk_id, taxonomy_value_ids)
+
+    def add_tags_to_talk(self, talk_id: str, taxonomy_value_ids: List[int]) -> bool:
+        """Add specific tags to a talk"""
+        return self.db.add_tags_to_talk(talk_id, taxonomy_value_ids)
+
+    def remove_tag_from_talk(self, talk_id: str, value_id: int) -> bool:
+        """Remove specific tag from talk"""
+        return self.db.remove_tag_from_talk(talk_id, value_id)
+
+    def get_taxonomy_usage_stats(self) -> Dict[str, Any]:
+        """Get usage statistics for all taxonomies"""
+        return self.db.get_tag_usage_stats()
+
+    def get_most_popular_tags(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get most used tags across all taxonomies"""
+        return self.db.get_most_popular_tags(limit)

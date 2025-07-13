@@ -1,7 +1,8 @@
 # tests/test_postgres_client.py
 """
-Tests for Ring 2: Database/API layer using test PostgreSQL database
-These tests verify PostgreSQL-specific functionality like full-text search.
+Tests for Ring 3: Database infrastructure layer using test PostgreSQL database
+These tests verify PostgreSQL-specific functionality like full-text search, JSONB operations,
+and database persistence. Tests the adapter between our application and PostgreSQL.
 """
 import pytest
 from backend.database.postgres_client import PostgresClient

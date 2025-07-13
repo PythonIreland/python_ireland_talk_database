@@ -94,3 +94,41 @@ class TalkSearch(BaseModel):
     cities: Optional[List[str]] = None  # For Meetup cities
     limit: int = 20
     offset: int = 0
+
+
+# Taxonomy management models
+class CreateTaxonomyRequest(BaseModel):
+    name: str
+    description: str = ""
+    created_by: str = "system"
+
+
+class UpdateTaxonomyRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CreateTaxonomyValueRequest(BaseModel):
+    value: str
+    description: str = ""
+    color: str = ""
+
+
+class UpdateTaxonomyValueRequest(BaseModel):
+    value: Optional[str] = None
+    description: Optional[str] = None
+    color: Optional[str] = None
+
+
+class AddTagsRequest(BaseModel):
+    taxonomy_value_ids: List[int]
+
+
+class ReplaceTalkTagsRequest(BaseModel):
+    taxonomy_value_ids: List[int]
+
+
+class TalkTagsResponse(BaseModel):
+    talk_id: str
+    auto_tags: List[str]
+    manual_tags: Dict[str, List[str]]  # taxonomy_name -> [values]
