@@ -166,12 +166,11 @@ class PostgresClient:
                 if talk_types:
                     query_obj = query_obj.filter(Talk.talk_type.in_(talk_types))
 
-                # Filter by auto tags
+                # Filter by auto tags - use JSONB ? operator
                 if tags:
                     for tag in tags:
-                        query_obj = query_obj.filter(
-                            func.json_array_elements_text(Talk.auto_tags).op("=")(tag)
-                        )
+                        # Use ? operator to check if JSON array contains the value
+                        query_obj = query_obj.filter(Talk.auto_tags.op("?")(tag))
 
                 # Filter by events (stored in type_specific_data)
                 if events:

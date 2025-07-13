@@ -1,5 +1,6 @@
 # backend/database/models.py
-from sqlalchemy import Column, String, Text, Integer, DateTime, JSON, ForeignKey, Table
+from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Table
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -28,7 +29,7 @@ class Talk(Base):
     talk_type = Column(String, nullable=False)  # 'pycon', 'meetup', 'youtube', etc.
     title = Column(String, nullable=False)
     description = Column(Text, default="")
-    speaker_names = Column(JSON, default=list)  # List[str]
+    speaker_names = Column(JSONB, default=list)  # List[str]
     source_url = Column(String)
 
     # Timestamps
@@ -36,13 +37,13 @@ class Talk(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Extensible JSON field for type-specific data
-    type_specific_data = Column(JSON, default=dict)  # Dict[str, Any]
+    type_specific_data = Column(JSONB, default=dict)  # Dict[str, Any]
 
     # Full-text search fields (for Postgres FTS)
     search_vector = Column(Text)  # Will contain concatenated searchable text
 
     # Auto-generated tags (from content analysis)
-    auto_tags = Column(JSON, default=list)  # List[str]
+    auto_tags = Column(JSONB, default=list)  # List[str]
 
     # Relationships
     taxonomy_values = relationship(

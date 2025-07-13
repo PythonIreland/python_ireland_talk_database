@@ -1,33 +1,11 @@
 # tests/test_postgres_client.py
 """
-Tests for Ring 2: Database/API layer using in-memory SQLite
-These tests should be fast and use in-memory database for isolation.
+Tests for Ring 2: Database/API layer using test PostgreSQL database
+These tests verify PostgreSQL-specific functionality like full-text search.
 """
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from backend.database.postgres_client import PostgresClient
-from backend.database.models import Base
 from datetime import datetime
-
-
-@pytest.fixture
-def in_memory_db():
-    """Create an in-memory SQLite database for testing"""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    return engine
-
-
-@pytest.fixture
-def postgres_client(in_memory_db):
-    """Create a PostgresClient using in-memory SQLite"""
-    client = PostgresClient.__new__(PostgresClient)  # Create without __init__
-    client.engine = in_memory_db
-    client.SessionLocal = sessionmaker(
-        autocommit=False, autoflush=False, bind=in_memory_db
-    )
-    return client
 
 
 class TestPostgresClient:
