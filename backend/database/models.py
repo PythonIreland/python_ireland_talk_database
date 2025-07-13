@@ -1,4 +1,16 @@
 # backend/database/models.py
+"""
+Infrastructure layer (Ring 3) - Database persistence models
+
+This layer contains:
+- SQLAlchemy models for database persistence
+- PostgreSQL-specific features (JSONB, full-text search)
+- Database schema definitions
+- ORM relationships and constraints
+
+Dependencies: SQLAlchemy, PostgreSQL-specific libraries
+No business logic - pure infrastructure concerns
+"""
 from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Table
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base

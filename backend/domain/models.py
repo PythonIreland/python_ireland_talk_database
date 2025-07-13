@@ -1,4 +1,16 @@
-# backend/models/talk.py
+# backend/domain/models.py
+"""
+Domain layer (Ring 2) - Pure business domain models
+
+This layer contains:
+- Domain entities and value objects (Pydantic models)
+- Business data structures and contracts
+- Domain enums and types
+- Pure business logic validation
+
+Dependencies: Only standard library and domain libraries (Pydantic)
+No infrastructure dependencies - these models should work with any persistence layer
+"""
 from pydantic import BaseModel
 from typing import List, Dict, Optional, Union
 from datetime import datetime

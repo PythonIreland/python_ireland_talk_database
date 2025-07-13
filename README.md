@@ -8,71 +8,69 @@ A searchable database of Python Ireland conference talks and meetup events with 
 
 ## 🚀 Quick Start
 
-### Prerequisites
+Choose your preferred setup method:
 
-- **PostgreSQL** (local install or Docker)
-- **Node.js 20+** (for frontend)
-- **Python 3.11+** with Pipenv (for backend)
+### Option 1: Full Docker (Recommended)
 
-### 1. Start PostgreSQL
+**Perfect for:** First-time users, demos, consistent environments
 
 ```bash
-# Option A: Using Docker (recommended)
-docker run -d \
-  --name postgres \
-  -p 5432:5432 \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=password \
-  -e POSTGRES_DB=talks_db \
-  postgres:15
+# Start everything with one command
+docker-compose up
 
-# Option B: Using local PostgreSQL
+# Visit the app at http://localhost:8000
+# API docs at http://localhost:8000/docs
+```
+
+### Option 2: Local Development + Docker Database
+
+**Perfect for:** Active development, faster iteration
+
+```bash
+# 1. Start just the database
+docker-compose up postgres -d
+
+# 2. Setup backend
+pipenv install --dev && pipenv shell
+python scripts/init_postgres.py
+cd backend && python run.py
+
+# 3. Setup frontend (new terminal)
+cd frontend && npm install && npm run dev
+
+# Backend: http://localhost:8000
+# Frontend: http://localhost:5173
+```
+
+### Option 3: Manual Setup
+
+**Perfect for:** Custom configurations, production deployments
+
+Prerequisites: PostgreSQL, Python 3.11+, Node.js 20+
+
+```bash
+# Create database
 createdb talks_db
 
-# Option C: Using docker-compose
-docker-compose up postgres -d
+# Configure environment
+export DATABASE_URL="postgresql://localhost/talks_db"
+
+# Follow Option 2 steps 2-3 above
 ```
 
-### 2. Setup Backend
+---
+
+## 🎯 Load Sample Data
+
+After starting the backend:
 
 ```bash
-# Install dependencies and activate environment
-pipenv install
-pipenv shell
-
-# Initialize PostgreSQL database and create tables
-python scripts/init_postgres.py
-
-# Start FastAPI server
-cd backend
-python run.py
-```
-
-### 3. Load Data
-
-```bash
-# Ingest talks from Sessionize (PyCon events) and Meetup
+# Load talks from conferences and meetups
 curl -X POST http://localhost:8000/api/v1/talks/ingest
 
 # Verify data loaded
 curl http://localhost:8000/api/v1/talks/search
-
-# Check available taxonomies
-curl http://localhost:8000/api/v1/talks/taxonomies
 ```
-
-### 4. Start Frontend
-
-```bash
-# In a new terminal
-cd frontend
-npm install
-npm run dev
-
-# Open http://localhost:5173/explorer
-```
-
-You should now see the Talk Explorer with searchable/filterable Python Ireland talk data!
 
 ---
 
@@ -84,71 +82,36 @@ You should now see the Talk Explorer with searchable/filterable Python Ireland t
 
 ---
 
-## 📦 Frontend Development
-
-### Prerequisites
-
-- **Node.js 20+**: `node --version` should show 20.x or higher
-
-### Setup
+## 🧪 Running Tests
 
 ```bash
-cd frontend
-npm install
+# Run all tests (starts test database automatically)
+pipenv run pytest
 
-# Optional: Configure backend URL (defaults to http://localhost:8000)
-echo "VITE_BACKEND_URL=http://localhost:8000" > .env
-
-# Start development server
-npm run dev
+# Run specific test suites
+pipenv run pytest tests/test_ring1.py -v        # Business logic
+pipenv run pytest tests/test_postgres_client.py -v  # Database layer
 ```
-
-Open http://localhost:5173/explorer to see the Talk Explorer!
 
 ---
 
-## 🔧 Advanced Usage & Testing
+## � API Usage
 
-### API Examples
+### Search Examples
 
 ```bash
 # Search talks by keyword
 curl "http://localhost:8000/api/v1/talks/search?q=django"
 
-# Filter by talk type
-curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon&talk_types=meetup"
+# Filter by talk type and tags
+curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon&tags=web"
 
-# Get available taxonomies
-curl http://localhost:8000/api/v1/talks/taxonomies
-
-# Health check
-curl http://localhost:8000/api/v1/talks/health
+# Get available events and taxonomies
+curl "http://localhost:8000/api/v1/talks/events"
+curl "http://localhost:8000/api/v1/talks/taxonomies"
 ```
 
-### Complete Pipeline Test
-
-```bash
-# Health check
-curl http://localhost:8000/api/v1/talks/health
-
-# Ingest all data (Sessionize + Meetup)
-curl -X POST http://localhost:8000/api/v1/talks/ingest
-
-# Search and filter
-curl http://localhost:8000/api/v1/talks/search
-curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon"
-curl "http://localhost:8000/api/v1/talks/search?q=django"
-```
-
-### Development Commands
-
-```bash
-# Run tests
-bash scripts/test_postgres.sh
-
-# Reset database (careful!)
-python scripts/init_postgres.py
-```
+**📚 Full API Documentation:** http://localhost:8000/docs
 
 ---
 
@@ -210,11 +173,34 @@ flowchart LR
   B --> E
 ```
 
-### Concentric Rings Pattern
+### Hexagonal Architecture (Ports & Adapters)
 
-- **Ring 1:** Pure Python business logic (`lib/engine/`)
-- **Ring 2:** Database/API layer (`backend/database/`, `backend/services/`)
-- **Ring 3:** Frontend React application (`frontend/`)
+Following the **Hexagonal Architecture** pattern by Alistair Cockburn:
+
+- **Ring 1 - Core Domain:** Pure business logic (`lib/engine/`) - No external dependencies
+- **Ring 2 - Application Layer:** Use cases, orchestration, and domain models (`backend/services/`, `backend/domain/`)
+- **Ring 3 - Infrastructure:** Technical adapters (`backend/database/`, `backend/api/`, `frontend/`)
+
+**Key Architectural Distinctions:**
+
+- **Domain Models** (`backend/domain/models.py`): Pydantic models representing business entities - technology agnostic
+- **Database Models** (`backend/database/models.py`): SQLAlchemy models with PostgreSQL-specific features (JSONB, etc.)
+- **Database Logic** (how to search) is Ring 2, **Database Implementation** (PostgreSQL specifics) is Ring 3
+
+**Benefits:** Highly testable, technology-agnostic core, easy to swap external dependencies.
+
+**Directory Structure by Architectural Ring:**
+
+```
+lib/engine/           # Ring 1: Pure business logic (data processing, tagging)
+backend/domain/       # Ring 2: Domain models and business entities
+backend/services/     # Ring 2: Application orchestration and use cases
+backend/database/     # Ring 3: Database persistence and PostgreSQL specifics
+backend/api/          # Ring 3: HTTP adapters and REST endpoints
+frontend/             # Ring 3: User interface adapters
+```
+
+**Further Reading:** [Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/) by Alistair Cockburn
 
 ---
 
