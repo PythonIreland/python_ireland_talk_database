@@ -271,12 +271,15 @@ class PostgresClient:
                 return {}
 
     def delete_all_talks(self) -> bool:
-        """Delete all talks (useful for testing)"""
+        """Delete all talks (useful for testing) - handles foreign key constraints"""
         with self.get_session() as session:
             try:
+                # First delete all talk-taxonomy relationships
+                session.query(talk_taxonomy_values).delete(synchronize_session=False)
+                # Then delete all talks
                 session.query(Talk).delete()
                 session.commit()
-                logger.info("Deleted all talks")
+                logger.info("Deleted all talks and their taxonomy relationships")
                 return True
             except SQLAlchemyError as e:
                 session.rollback()
@@ -685,12 +688,10 @@ class PostgresClient:
 
                 # Text search
                 if query:
+                    # Simplified search without speaker_names for now
                     search_filter = or_(
                         Talk.title.ilike(f"%{query}%"),
                         Talk.description.ilike(f"%{query}%"),
-                        func.array_to_string(Talk.speaker_names, " ").ilike(
-                            f"%{query}%"
-                        ),
                     )
                     query_obj = query_obj.filter(search_filter)
 
