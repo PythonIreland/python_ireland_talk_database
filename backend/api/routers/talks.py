@@ -1,7 +1,7 @@
 # backend/api/routers/talks.py
 from fastapi import APIRouter, HTTPException, Query, Depends
 from backend.domain.models import TalkSearch, TalkType
-from services.talk_service import TalkService
+from backend.services.talk_service import TalkService
 from typing import List, Optional
 
 router = APIRouter()

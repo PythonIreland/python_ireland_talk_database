@@ -31,7 +31,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn backend.run:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8001:8000"
     volumes:
@@ -44,7 +44,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    working_dir: /app/backend
+    working_dir: /app
 
   frontend:
     build:

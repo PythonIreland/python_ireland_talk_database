@@ -1,7 +1,7 @@
 # backend/run.py - fix the uvicorn.run call
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import talks
+from backend.api.routers import talks
 
 app = FastAPI(title="Python Ireland Talk Database API")
 
@@ -20,4 +20,4 @@ if __name__ == "__main__":
     import uvicorn
 
     # Use import string instead of app object for reload to work
-    uvicorn.run("run:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("backend.run:app", host="0.0.0.0", port=8000, reload=True)

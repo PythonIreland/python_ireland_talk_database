@@ -33,7 +33,7 @@ docker-compose up postgres -d
 # 2. Setup backend
 pipenv install --dev && pipenv shell
 python scripts/init_postgres.py
-cd backend && python run.py
+python -m backend.run
 
 # 3. Setup frontend (new terminal)
 cd frontend && npm install && npm run dev
