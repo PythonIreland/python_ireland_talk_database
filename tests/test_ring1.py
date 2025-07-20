@@ -7,6 +7,7 @@ import pytest
 from unittest.mock import Mock
 from datetime import datetime
 from lib.engine.data_pipeline import DataPipeline
+from backend.domain.services.talk_domain_service import TalkDomainService
 
 
 class TestDataPipeline:
@@ -14,10 +15,8 @@ class TestDataPipeline:
 
     def test_extract_auto_tags_ai_ml(self):
         """Test auto tag extraction for AI/ML content"""
-        pipeline = DataPipeline()
-
-        # Test AI/ML keywords
-        tags = pipeline._extract_auto_tags(
+        # Test domain service directly since business logic moved there
+        tags = TalkDomainService.extract_auto_tags(
             "Introduction to Machine Learning",
             "Learn about neural networks and deep learning",
         )
@@ -25,9 +24,7 @@ class TestDataPipeline:
 
     def test_extract_auto_tags_web_dev(self):
         """Test auto tag extraction for web development"""
-        pipeline = DataPipeline()
-
-        tags = pipeline._extract_auto_tags(
+        tags = TalkDomainService.extract_auto_tags(
             "Building APIs with FastAPI",
             "Learn how to create REST APIs using FastAPI framework",
         )
@@ -35,9 +32,7 @@ class TestDataPipeline:
 
     def test_extract_auto_tags_data_science(self):
         """Test auto tag extraction for data science"""
-        pipeline = DataPipeline()
-
-        tags = pipeline._extract_auto_tags(
+        tags = TalkDomainService.extract_auto_tags(
             "Data Analysis with Pandas",
             "Explore data visualization and analysis techniques",
         )
@@ -45,18 +40,14 @@ class TestDataPipeline:
 
     def test_extract_auto_tags_testing(self):
         """Test auto tag extraction for testing"""
-        pipeline = DataPipeline()
-
-        tags = pipeline._extract_auto_tags(
+        tags = TalkDomainService.extract_auto_tags(
             "Test-Driven Development", "Learn pytest and unittest frameworks"
         )
         assert "Testing" in tags
 
     def test_extract_auto_tags_multiple(self):
         """Test auto tag extraction for content with multiple tags"""
-        pipeline = DataPipeline()
-
-        tags = pipeline._extract_auto_tags(
+        tags = TalkDomainService.extract_auto_tags(
             "Testing Django Applications",
             "Learn how to test your Django web applications using pytest",
         )
@@ -65,9 +56,7 @@ class TestDataPipeline:
 
     def test_extract_auto_tags_none(self):
         """Test auto tag extraction for content without recognizable keywords"""
-        pipeline = DataPipeline()
-
-        tags = pipeline._extract_auto_tags(
+        tags = TalkDomainService.extract_auto_tags(
             "Python Basics", "Introduction to Python programming"
         )
         # Should return empty list or only generic tags

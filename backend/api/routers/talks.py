@@ -1,6 +1,6 @@
 # backend/api/routers/talks.py
 from fastapi import APIRouter, HTTPException, Query, Depends
-from backend.domain.models import (
+from backend.contracts.dtos import (
     TalkSearch,
     TalkType,
     CreateTaxonomyRequest,

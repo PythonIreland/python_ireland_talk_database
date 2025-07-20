@@ -2,7 +2,7 @@
 from typing import Dict, List, Any, Optional, Tuple
 import logging
 from backend.database.postgres_client import PostgresClient
-from backend.domain.models import TalkType
+from backend.contracts.dtos import TalkType
 from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
