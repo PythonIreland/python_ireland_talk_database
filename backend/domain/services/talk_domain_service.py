@@ -90,6 +90,17 @@ class TalkDomainService:
         if any(keyword in text for keyword in test_keywords):
             keywords.append("Testing")
 
+        # Integration Keywords
+        integration_keywords = [
+            "integration",
+            "end-to-end",
+            "e2e",
+            "workflow",
+            "full flow",
+        ]
+        if any(keyword in text for keyword in integration_keywords):
+            keywords.append("Integration")
+
         # DevOps Keywords
         devops_keywords = [
             "docker",

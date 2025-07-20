@@ -286,6 +286,24 @@ class PostgresClient:
                 logger.error(f"Failed to delete talks: {e}")
                 return False
 
+    def delete_all_taxonomies(self) -> bool:
+        """Delete all taxonomies and their values (useful for testing)"""
+        with self.get_session() as session:
+            try:
+                # First delete all talk-taxonomy relationships
+                session.query(talk_taxonomy_values).delete(synchronize_session=False)
+                # Then delete all taxonomy values
+                session.query(TaxonomyValue).delete()
+                # Finally delete all taxonomies
+                session.query(Taxonomy).delete()
+                session.commit()
+                logger.info("Deleted all taxonomies, values, and relationships")
+                return True
+            except SQLAlchemyError as e:
+                session.rollback()
+                logger.error(f"Failed to delete taxonomies: {e}")
+                return False
+
     def get_talk_count(self) -> int:
         """Get total number of talks"""
         with self.get_session() as session:

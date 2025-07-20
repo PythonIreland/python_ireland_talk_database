@@ -17,6 +17,16 @@ class CreateTalkUseCase:
     def execute(self, talk_data: Dict[str, Any]) -> str:
         """Create a new talk with business validation"""
 
+        # Check for duplicates if source information is provided
+        source_type = talk_data.get("source_type")
+        source_id = talk_data.get("source_id")
+        if source_type and source_id:
+            existing_talk = self.talk_repository.find_by_source(source_type, source_id)
+            if existing_talk:
+                raise ValueError(
+                    f"Talk already exists with source {source_type}:{source_id}"
+                )
+
         # Validate using domain service
         errors = self.domain_service.validate_talk_data(talk_data)
         if errors:
@@ -34,7 +44,8 @@ class CreateTalkUseCase:
 
         # Validate that talk_type is a valid enum value
         try:
-            talk_type = TalkType(talk_type_str)
+            # Normalize to lowercase for enum matching
+            talk_type = TalkType(talk_type_str.lower())
         except ValueError:
             # If invalid, default to conference_talk
             talk_type = TalkType.CONFERENCE_TALK
@@ -42,7 +53,7 @@ class CreateTalkUseCase:
         # Create domain entity
         talk = Talk(
             id=talk_data["id"],
-            title=talk_data["title"],
+            title=talk_data["title"].strip(),  # Clean whitespace
             description=talk_data.get("description", ""),
             talk_type=talk_type,
             speaker_names=self.domain_service.normalize_speaker_names(

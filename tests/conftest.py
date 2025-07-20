@@ -78,8 +78,10 @@ def postgres_client(test_database_url, ensure_test_db):
 
     # Clean slate before each test
     client.delete_all_talks()
+    client.delete_all_taxonomies()
 
     yield client
 
     # Clean up after each test
     client.delete_all_talks()
+    client.delete_all_taxonomies()
