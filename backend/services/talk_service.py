@@ -4,16 +4,40 @@ import logging
 from backend.database.postgres_client import PostgresClient
 from backend.contracts.dtos import TalkType
 from backend.core.config import settings
+from backend.application.use_cases.create_talk import CreateTalkUseCase
+
+# Note: We'll implement these use cases step by step
+# from backend.application.use_cases.search_talks import SearchTalksUseCase
+# from backend.application.use_cases.update_talk import UpdateTalkUseCase
+from backend.domain.services.talk_domain_service import TalkDomainService
+from backend.infrastructure.repositories.postgres_talk_repository import (
+    PostgresTalkRepository,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class TalkService:
-    """Service layer for talk operations - Ring 2 of the architecture"""
+    """Service layer for talk operations - Ring 3 of the architecture
+
+    This service orchestrates use cases and provides the interface for external consumers.
+    It follows Clean Architecture by depending on use cases rather than infrastructure directly.
+    """
 
     def __init__(self, postgres_client: Optional[PostgresClient] = None):
         # Allow dependency injection for testing
         self.db = postgres_client or PostgresClient(settings.database_url)
+
+        # Initialize domain services and repositories
+        self.domain_service = TalkDomainService()
+        self.talk_repository = PostgresTalkRepository(self.db)
+
+        # Initialize use cases with dependencies
+        self.create_talk_use_case = CreateTalkUseCase(
+            self.talk_repository, self.domain_service
+        )
+        # self.search_talks_use_case = SearchTalksUseCase(self.talk_repository)
+        # self.update_talk_use_case = UpdateTalkUseCase(self.talk_repository)
 
     def is_healthy(self) -> bool:
         """Check service health"""
@@ -24,10 +48,9 @@ class TalkService:
         return self.db.init_database()
 
     def create_talk(self, talk_data: Dict[str, Any]) -> str:
-        """Create a new talk"""
-        # Convert talk data to the format expected by Postgres
-        postgres_data = self._convert_to_postgres_format(talk_data)
-        return self.db.index_talk(postgres_data)
+        """Create a new talk using Clean Architecture use case"""
+        # Delegate to use case - this follows the dependency rule
+        return self.create_talk_use_case.execute(talk_data)
 
     def get_talk(self, talk_id: str) -> Optional[Dict[str, Any]]:
         """Get a single talk by ID"""
