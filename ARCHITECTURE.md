@@ -4,279 +4,353 @@
 
 The Python Ireland Talk Database follows **Clean Architecture** principles, ensuring separation of concerns, testability, and maintainability. The system is designed around concentric rings where inner rings contain business logic and outer rings contain implementation details.
 
+### Clean Architecture Visualization
+
+This diagram shows the **actual implementation** with the specific classes and components that have been built:
+
 ```mermaid
-graph TB
-    subgraph "Ring 1: Enterprise Business Rules"
-        E1[Domain Entities]
-        E2[Business Rules]
-        E3[Core Logic]
+graph TD
+    subgraph R1 ["🎯 Ring 1: Entities (Enterprise Business Rules)"]
+        direction TB
+        E1[Rich Domain Entities<br/>Talk, Taxonomy]
+        E2[Domain Services<br/>TalkDomainService]
+        E3[Pure Business Logic<br/>No Framework Dependencies]
     end
 
-    subgraph "Ring 2: Application Business Rules"
-        A1[Use Cases]
-        A2[Application Services]
-        A3[Domain Models]
+    subgraph R2 ["⚙️ Ring 2: Use Cases (Application Business Rules)"]
+        direction TB
+        U1[CreateTalkUseCase]
+        U2[SearchTalksUseCase]
+        U3[ManageTaxonomyUseCase]
     end
 
-    subgraph "Ring 3: Interface Adapters"
-        I1[Controllers/API]
-        I2[Data Gateways]
-        I3[Presenters]
+    subgraph R3 ["🔌 Ring 3: Interface Adapters"]
+        direction TB
+        I1[HTTP API Controllers<br/>FastAPI Routers]
+        I2[Repository Interfaces<br/>TalkRepository]
+        I3[Database Models<br/>SQLAlchemy ORM]
+        I4[DTOs & Contracts<br/>Request/Response Models]
     end
 
-    subgraph "Ring 4: Frameworks & Drivers"
-        F1[Database/PostgreSQL]
-        F2[Web Framework/FastAPI]
-        F3[UI Framework/React]
-        F4[External APIs]
+    subgraph R4 ["🛠️ Ring 4: Frameworks & Drivers"]
+        direction TB
+        F1[PostgreSQL Database]
+        F2[Repository Implementations<br/>PostgresTalkRepository]
+        F3[External APIs<br/>Meetup, Sessionize]
+        F4[React Frontend]
+        F5[Application Services<br/>TalkService]
     end
 
-    E1 --> A1
-    E2 --> A2
-    E3 --> A3
-    A1 --> I1
-    A2 --> I2
-    A3 --> I3
-    I1 --> F1
-    I2 --> F2
-    I3 --> F3
-    I1 --> F4
+    %% Dependencies point inward (Architecture rule)
+    F2 --> I2
+    F1 --> I2
+    F3 --> F5
+    F5 --> U1
+    F5 --> U2
+    F5 --> U3
+    I1 --> U1
+    I1 --> U2
+    I1 --> U3
+    U1 --> E1
+    U1 --> E2
+    U2 --> E1
+    U2 --> E2
+    U3 --> E1
+
+    %% Styling
+    classDef ring1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000
+    classDef ring2 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+    classDef ring3 fill:#fff8e1,stroke:#f57c00,stroke-width:2px,color:#000
+    classDef ring4 fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#000
+
+    class E1,E2,E3 ring1
+    class U1,U2,U3 ring2
+    class I1,I2,I3,I4 ring3
+    class F1,F2,F3,F4,F5 ring4
 ```
 
-## Directory Structure Reality Check
+### Key Principles Shown:
 
-### **Current Structure:**
+1. **Dependencies point inward** - Outer rings depend on inner rings, never the reverse
+2. **Actual classes** - This shows the actual components that have been built rather than generic placeholders
+3. **Clean separation** - Each ring has a specific responsibility
+4. **Framework independence** - The business logic (Rings 1 & 2) doesn't know about databases or web frameworks
 
-```
-backend/domain/         # 🚨 MISNAMED: Contains DTOs, not domain entities
-backend/services/       # ✅ CORRECT: Application business rules
-backend/api/            # ✅ CORRECT: Interface adapters (controllers)
-backend/database/       # ✅ CORRECT: Interface adapters (data gateways)
-lib/engine/             # 🚨 MIXED: Business logic + external drivers
-frontend/               # ✅ CORRECT: Frameworks & drivers
-```
+**In Simple Terms:**
 
-### **Proper Clean Architecture Mapping:**
+- **Ring 1**: Core business rules (what makes a talk valid, how auto-tagging works)
+- **Ring 2**: Application workflows (how to create a talk, search talks)
+- **Ring 3**: Translation layer (HTTP to business logic, business logic to database)
+- **Ring 4**: External tools (PostgreSQL, React, APIs)
 
-```
-Ring 1: lib/engine/data_pipeline.py (business methods only)
-Ring 2: backend/services/
-Ring 3: backend/api/ + backend/database/ + backend/domain/models.py
-Ring 4: lib/engine/meetup.py + lib/engine/sessionize.py + PostgreSQL + React
-```
+## Architecture Implementation
 
-### **Ideal Structure (Future):**
+### **Project Structure:**
 
 ```
-backend/core/entities.py       # Ring 1: Pure domain entities
-backend/core/services.py       # Ring 1: Pure business logic
-backend/usecases/              # Ring 2: Application business rules
-backend/adapters/api/          # Ring 3: HTTP controllers
-backend/adapters/database/     # Ring 3: Data gateways
-backend/contracts/             # Ring 3: DTOs and interfaces
-lib/drivers/                   # Ring 4: External service clients
+backend/domain/entities/        # Ring 1: Rich domain entities with business behavior
+backend/domain/services/        # Ring 1: Pure business logic and domain services
+backend/application/use_cases/  # Ring 2: Application business rules and use cases
+backend/contracts/             # Ring 3: Repository interfaces and DTOs
+backend/infrastructure/        # Ring 4: Repository implementations
+backend/services/              # Ring 3: Service layer orchestration
+backend/api/                   # Ring 3: HTTP controllers and API endpoints
+backend/database/              # Ring 4: Database client and models
+lib/engine/                    # Ring 4: External API clients and data pipeline
+frontend/                      # Ring 4: React UI framework
+```
+
+### **Architecture Mapping:**
+
+```
+Ring 1 (Entities): backend/domain/entities/ + backend/domain/services/
+Ring 2 (Use Cases): backend/application/use_cases/
+Ring 3 (Interface Adapters): backend/contracts/ + backend/services/ + backend/api/
+Ring 4 (Frameworks & Drivers): backend/infrastructure/ + backend/database/ + lib/engine/ + PostgreSQL + React
 ```
 
 ---
 
 ## Current Implementation Analysis
 
-**Note:** Our current codebase doesn't perfectly align with textbook Clean Architecture. Here's the honest mapping of what we actually have:
+The codebase implements Clean Architecture principles with clear separation of concerns across four distinct rings:
 
 ---
 
 ## Ring 1: Enterprise Business Rules
 
-**⚠️ Currently Mixed/Scattered** - This is our weakest ring in terms of Clean Architecture adherence.
+**Location:** `backend/domain/entities/` and `backend/domain/services/`
 
-**Pure Business Logic Found In:**
+### Domain Entities (`backend/domain/entities/`)
 
-- `lib/engine/data_pipeline.py` (transformation algorithms):
-  ```python
-  def _convert_meetup_to_talk(event) -> Dict        # Business transformation
-  def _convert_sessionize_to_talk(talk) -> Dict     # Business transformation
-  def _should_update_talk(existing, new) -> bool    # Business rules
-  def _extract_auto_tags(title, description) -> List[str]  # Content analysis
-  ```
-
-**What's Missing:** True domain entities with behavior. Our current "entities" are just data containers.
-
-**Ideal Ring 1 (Future Refactoring):**
+**Rich Domain Entities with Business Behavior:**
 
 ```python
-# Should have: backend/core/entities.py
+# backend/domain/entities/talk.py
 class Talk:
     """Rich domain entity with business behavior"""
-    def add_taxonomy_value(self, value: TaxonomyValue) -> None:
-        # Business rule enforcement
 
-    def is_eligible_for_auto_tagging(self) -> bool:
-        # Business logic
+    # Business methods
+    def is_valid(self) -> bool:
+        """Comprehensive business validation"""
 
+    def add_speaker(self, speaker_name: str) -> None:
+        """Business rule: add speaker with validation"""
+
+    def update_content(self, title: str = None, description: str = None) -> None:
+        """Business rule: update content and refresh metadata"""
+
+    def has_keyword(self, keyword: str) -> bool:
+        """Business rule: search for keyword in talk content"""
+
+    def is_by_speaker(self, speaker_name: str) -> bool:
+        """Business rule: check if talk is by specific speaker"""
+
+    def get_duration_minutes(self) -> Optional[int]:
+        """Business rule: extract duration from type-specific data"""
+
+# backend/domain/entities/taxonomy.py
 class Taxonomy:
-    """Classification business entity"""
-    def add_value(self, value: str) -> TaxonomyValue:
-        # Business validation
+    """Domain entity for classification systems"""
+
+    def add_value(self, value: str, description: str = "", color: str = "") -> TaxonomyValue:
+        """Business rule: add new taxonomy value with validation"""
+
+    def find_value_by_name(self, value_name: str) -> Optional[TaxonomyValue]:
+        """Business rule: find value by name (case-insensitive)"""
 ```
+
+### Domain Services (`backend/domain/services/`)
+
+**Pure Business Logic Services:**
+
+```python
+# backend/domain/services/talk_domain_service.py
+class TalkDomainService:
+    """Pure business logic for talks - Entities Layer (Ring 1)"""
+
+    @staticmethod
+    def extract_auto_tags(title: str, description: str) -> List[str]:
+        """Business rule: intelligent content analysis and tagging"""
+        # 6 categories: AI/ML, Web Dev, Data Science, Testing, DevOps, Python Core
+
+    @staticmethod
+    def determine_talk_type(source_type: str, session_data: Dict[str, Any]) -> str:
+        """Business rule: determine talk type from session data"""
+
+    @staticmethod
+    def validate_talk_data(talk_data: Dict[str, Any]) -> List[str]:
+        """Business rule: comprehensive talk data validation"""
+
+    @staticmethod
+    def should_update_talk(existing_talk: Dict, new_talk: Dict) -> bool:
+        """Business rule: determine if talk should be updated"""
+
+    @staticmethod
+    def normalize_speaker_names(speaker_names: List[str]) -> List[str]:
+        """Business rule: standardize speaker name format"""
+```
+
+**Key Characteristics:**
+
+- Zero external dependencies
+- Pure business logic
+- Framework-agnostic
+- Comprehensive business rules
 
 ---
 
 ## Ring 2: Application Business Rules
 
-**Location:** `backend/services/talk_service.py`
+**Locations:** `backend/application/use_cases/` and `backend/services/`
 
-This is our strongest Clean Architecture implementation - proper use case orchestration.
+### Use Cases (`backend/application/use_cases/`)
 
-### Application Services (`backend/services/talk_service.py`)
-
-Well-implemented application layer coordinating business operations:
+**Clean Use Case Implementation:**
 
 ```python
-class TalkService:
-    """Application layer coordinating business operations"""
+# backend/application/use_cases/create_talk.py
+class CreateTalkUseCase:
+    """Use case for creating a new talk - Ring 2"""
 
-    # Talk lifecycle use cases
-    def create_talk(talk_data: Dict) -> str
-    def get_talk(talk_id: str) -> Optional[Dict]
-    def search_talks(...) -> Tuple[List[Dict], int]
+    def __init__(self, talk_repository: TalkRepository, domain_service: TalkDomainService):
+        self.talk_repository = talk_repository
+        self.domain_service = domain_service
 
-    # Taxonomy management use cases
-    def create_taxonomy(name: str, description: str) -> int
-    def create_taxonomy_value(...) -> int
-    def initialize_default_taxonomies() -> None
+    def execute(self, talk_data: Dict[str, Any]) -> str:
+        """Create a new talk with business validation"""
+        # 1. Validate using domain service
+        # 2. Create domain entity
+        # 3. Apply business rules
+        # 4. Enhance with auto-tags
+        # 5. Persist through repository
 
-    # Synchronization use cases
-    def get_sync_status(source_type: str) -> Optional[Dict]
-    def update_sync_status(...) -> bool
-    def upsert_talk(talk_data: Dict) -> Optional[str]
-    def get_talk_by_source(...) -> Optional[Dict]
+# Additional use cases:
+# - SearchTalksUseCase: Complex search with business logic
+# - UpdateTalkUseCase: Talk lifecycle management
+# - ManageTaxonomyUseCase: Classification management
 ```
 
 **Key Responsibilities:**
 
-- Use case coordination ✅
-- Business rule enforcement ✅
-- Data format translation ✅
-- Cross-cutting concerns (logging, validation) ✅
+- Pure application business rules
+- Use case orchestration
+- Framework-independent workflows
+- Domain service coordination
 
 ---
 
 ## Ring 3: Interface Adapters
 
-**Locations:** `backend/api/`, `backend/database/`, `backend/domain/models.py`
+**Locations:** `backend/contracts/`, `backend/api/`, `backend/services/`, database adapters
 
-### **3a. HTTP Controllers** (`backend/api/routers/talks.py`)
+> **⚠️ Note on TalkService Architecture:**
+> Currently `TalkService` (classified as Ring 4) directly instantiates concrete dependencies like `PostgresTalkRepository`. This creates a dependency inversion violation since it bypasses the interfaces. For stricter Clean Architecture compliance, we could:
+>
+> 1. Move `TalkService` to Ring 3 and use dependency injection
+> 2. Pass repository interfaces through constructor instead of concrete implementations
+>
+> The current approach works but represents a pragmatic compromise over pure Clean Architecture.
 
-Properly implemented REST interface:
+### Repository Interfaces (`backend/contracts/repositories.py`)
 
-```python
-# Core domain entities
-class TalkType(str, Enum): ...
-class BaseTalk(BaseModel): ...
-class PyConTalk(BaseTalk): ...
-class MeetupTalk(BaseTalk): ...
-
-# Search and filtering
-class TalkSearch(BaseModel): ...
-
-# Taxonomy management
-class CreateTaxonomyRequest(BaseModel): ...
-class UpdateTaxonomyRequest(BaseModel): ...
-```
-
-**Design Principles:**
-
-- Framework-independent (Pydantic only)
-- Immutable data structures
-- Rich domain models with validation
-- Type safety throughout
-
-### Application Services (`backend/services/talk_service.py`)
-
-Orchestrates business operations and enforces application rules:
+**Clean Abstraction Contracts:**
 
 ```python
-class TalkService:
-    """Application layer coordinating business operations"""
+class TalkRepository(ABC):
+    """Repository interface defining data access contract"""
 
-    # Talk lifecycle
-    def create_talk(talk_data: Dict) -> str
-    def get_talk(talk_id: str) -> Optional[Dict]
-    def search_talks(...) -> Tuple[List[Dict], int]
+    @abstractmethod
+    def save(self, talk: Talk) -> str:
+        """Save talk and return ID"""
 
-    # Taxonomy management
-    def create_taxonomy(name: str, description: str) -> int
-    def create_taxonomy_value(...) -> int
-    def initialize_default_taxonomies() -> None
+    @abstractmethod
+    def find_by_id(self, talk_id: str) -> Optional[Talk]:
+        """Find talk by ID"""
 
-    # Synchronization management
-    def get_sync_status(source_type: str) -> Optional[Dict]
-    def update_sync_status(...) -> bool
-    def upsert_talk(talk_data: Dict) -> Optional[str]
-    def get_talk_by_source(...) -> Optional[Dict]
+    @abstractmethod
+    def search(self, query: str, filters: Dict[str, Any]) -> Tuple[List[Talk], int]:
+        """Search talks with filters"""
+
+class TaxonomyRepository(ABC):
+    """Repository interface for classification management"""
+    # Similar clean interface definition
 ```
 
-**Key Responsibilities:**
+### HTTP Controllers (`backend/api/routers/talks.py`)
 
-- Use case coordination
-- Business rule enforcement
-- Data format translation
-- Cross-cutting concerns (logging, validation)
+**RESTful API with Clean Architecture:**
 
----
-
-## Ring 3: Interface Adapters
-
-**Locations:** `backend/api/`, `backend/database/`
-
-Adapters that translate between the application core and external interfaces.
-
-### HTTP API Controllers (`backend/api/routers/talks.py`)
-
-RESTful HTTP interface translating web requests to use cases:
-
-````python
 ```python
 # Talk operations
 GET    /talks/                     # List talks with filtering
-GET    /talks/search               # Full-text search
+GET    /talks/search               # Full-text search with business logic
 GET    /talks/{id}                 # Get specific talk
-GET    /talks/events               # List available events
-GET    /talks/tags                 # List available tags
+POST   /talks/sync                 # Trigger use case orchestration
 
 # Taxonomy management
 GET    /talks/taxonomies           # List taxonomies
-POST   /talks/taxonomies           # Create taxonomy
-PUT    /talks/taxonomies/{id}      # Update taxonomy
-DELETE /talks/taxonomies/{id}      # Delete taxonomy
+POST   /talks/taxonomies           # Create via use case
+PUT    /talks/taxonomies/{id}      # Update via use case
+```
 
-# Synchronization
-POST   /talks/sync                 # Trigger incremental sync
-GET    /talks/sync/status          # Get sync status
-GET    /talks/sync/status/{source} # Get source-specific status
+### Request/Response DTOs (`backend/contracts/dtos.py`)
 
-# Administrative
-POST   /talks/ingest               # Full data ingestion
-DELETE /talks/all                  # Clear all data
-GET    /talks/health               # Health check
-````
-
-### **3b. Request/Response DTOs** (`backend/domain/models.py`)
-
-**⚠️ Naming Issue:** These are actually Interface Adapters (DTOs), not Domain Entities:
+**Proper Interface Contracts:**
 
 ```python
-# These are API contracts/DTOs, NOT domain entities
+# API contracts (correctly placed as DTOs)
 class CreateTaxonomyRequest(BaseModel): ...   # HTTP request DTO
 class TalkSearch(BaseModel): ...              # Search parameters DTO
 class BaseTalk(BaseModel): ...                # Response DTO
+
+# Domain enums
+class TalkType(Enum):
+    CONFERENCE_TALK = "conference_talk"
+    LIGHTNING_TALK = "lightning_talk"
+    WORKSHOP = "workshop"
+    KEYNOTE = "keynote"
+    MEETUP = "meetup"
+    PYCON = "pycon"
+    GENERAL_TALK = "talk"
 ```
 
-**Better Name:** Should be `backend/contracts/` or `backend/dtos/`
+---
 
-### **3c. Database Gateway** (`backend/database/postgres_client.py`)
+## Ring 4: Frameworks & Drivers
 
-PostgreSQL-specific implementation translating application data to database operations:
+**Locations:** `backend/infrastructure/`, `backend/database/`, `lib/engine/`, PostgreSQL, React
+
+### Repository Implementations (`backend/infrastructure/repositories/`)
+
+**Clean Infrastructure Implementation:**
+
+```python
+# backend/infrastructure/repositories/postgres_talk_repository.py
+class PostgresTalkRepository(TalkRepository):
+    """PostgreSQL implementation of TalkRepository - Ring 4"""
+
+    def __init__(self, postgres_client: PostgresClient):
+        self.db = postgres_client
+
+    def save(self, talk: Talk) -> str:
+        """Convert domain entity to database format and persist"""
+        talk_data = self._entity_to_db_format(talk)
+        return self.db.index_talk(talk_data)
+
+    def find_by_id(self, talk_id: str) -> Optional[Talk]:
+        """Retrieve from database and convert to domain entity"""
+        db_talk = self.db.get_talk(talk_id)
+        return self._db_to_entity_format(db_talk) if db_talk else None
+
+    def _entity_to_db_format(self, talk: Talk) -> Dict[str, Any]:
+        """Clean conversion between domain and persistence"""
+        return talk.to_dict()
+```
+
+### Database Gateway (`backend/database/postgres_client.py`)
+
+**PostgreSQL-specific implementation:**
 
 ```python
 class PostgresClient:
@@ -311,32 +385,34 @@ class PostgresClient:
 - Performance optimizations
 - Migration support
 
-### **3d. Database Models** (`backend/database/models.py`)
+### Application Services (`backend/services/talk_service.py`)
 
-SQLAlchemy ORM models - Infrastructure adapters for database persistence:
+**Current Implementation (Ring 4 Classification):**
 
 ```python
-# Core entities (SQLAlchemy ORM - Ring 3, NOT Ring 1)
-class Talk(Base): ...              # Database schema mapping
-class Taxonomy(Base): ...          # Table structure definition
-class TaxonomyValue(Base): ...     # Relational constraints
-class SyncStatus(Base): ...        # Persistence model
+class TalkService:
+    """Service layer with concrete dependencies - Ring 4"""
 
-# Association tables
-talk_taxonomy_values = Table(...)  # Many-to-many relationships
+    def __init__(self, postgres_client: Optional[PostgresClient] = None):
+        # Direct instantiation of concrete implementations
+        self.domain_service = TalkDomainService()
+        self.talk_repository = PostgresTalkRepository(self.db)
+
+        # Use case initialization
+        self.create_talk_use_case = CreateTalkUseCase(
+            self.talk_repository, self.domain_service
+        )
+
+    def create_talk(self, talk_data: Dict[str, Any]) -> str:
+        """Delegate to use case"""
+        return self.create_talk_use_case.execute(talk_data)
 ```
 
-**Note:** These are database mapping models, not business entities.
+> **Note:** This service is classified as Ring 4 because it directly instantiates concrete dependencies rather than using dependency injection with interfaces.
 
----
+### External API Clients (`lib/engine/`)
 
-## Ring 4: Frameworks & Drivers
-
-**Locations:** External frameworks, databases, and UI components
-
-### **4a. External API Clients** (`lib/engine/`)
-
-**⚠️ Correctly Placed:** These belong in Ring 4, not Ring 1:
+**Properly Isolated External Dependencies:**
 
 **Meetup Integration (`lib/engine/meetup.py`):**
 
@@ -358,7 +434,21 @@ class Sessionize:
     # REST API calls, HTTP requests, JSON parsing
 ```
 
-### **4b. Database (PostgreSQL)**
+**Data Pipeline (`lib/engine/data_pipeline.py`):**
+
+```python
+class DataPipeline:
+    """Coordinates external data sources with domain logic"""
+
+    def sync_incremental_data(self) -> Dict[str, Any]:
+        # Uses domain services for business logic
+        # Delegates to use cases for persistence
+        # Clean separation maintained
+```
+
+### Database (PostgreSQL)
+
+**Production-Ready Database Layer:**
 
 **Configuration:**
 
@@ -384,6 +474,10 @@ idx_talks_search     # GIN index for full-text search
 idx_talks_type       # Talk type filtering
 idx_talks_source     # Source-based queries
 ```
+
+---
+
+## Implementation Details
 
 ### Web Framework (FastAPI)
 
@@ -432,39 +526,7 @@ src/
 
 ---
 
-## 📊 Architectural State Assessment
-
-### ✅ **What We Do Well:**
-
-- **Ring 2 (Use Cases):** `TalkService` is excellent Clean Architecture implementation
-- **Ring 3 (Adapters):** Clear separation between API, database, and DTOs
-- **Ring 4 (Drivers):** Proper framework usage and external service integration
-- **Dependency Injection:** Well-implemented throughout the stack
-- **Testing:** Good layer isolation with proper mocking
-
-### ⚠️ **Areas for Improvement:**
-
-- **Ring 1 (Entities):** Missing true domain entities with business behavior
-- **Naming Convention:** `backend/domain/models.py` contains DTOs, not domain entities
-- **Business Logic Location:** Some business rules scattered in `lib/engine/data_pipeline.py`
-
-### 🎯 **Clean Architecture Score: 7/10**
-
-Strong application layer and interface adapters, but missing pure domain entities.
-
-### 🔄 **Potential Refactoring (Future):**
-
-```bash
-# Current problematic naming
-backend/domain/models.py        # Actually contains DTOs
-
-# Better structure would be:
-backend/core/entities.py        # True domain entities with behavior
-backend/contracts/dtos.py       # API request/response contracts
-backend/services/               # Keep as-is (excellent)
-backend/adapters/api/           # Renamed from backend/api/
-backend/adapters/database/      # Renamed from backend/database/
-```
+## Technology Stack
 
 ---
 

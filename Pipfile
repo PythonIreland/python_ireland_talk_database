@@ -24,6 +24,7 @@ pytest-asyncio = "*"
 black = "*"
 isort = "*"
 flake8 = "*"
+ipykernel = "*"
 
 [requires]
 python_version = "3.11"

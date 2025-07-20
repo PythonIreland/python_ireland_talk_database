@@ -16,7 +16,8 @@ class TalkType(Enum):
 
 @dataclass
 class Talk:
-    """Rich domain entity with business behavior"""
+    """Rich domain entity with business behavior
+    Required: id, title, description, talk_type, speaker_names"""
 
     id: str
     title: str
