@@ -20,7 +20,7 @@ classifiers = [
 dependencies = []
 
 [tool.hatch.build.targets.wheel]
-packages = ["lib"]
+packages = ["backend", "lib"]
 
 [tool.black]
 line-length = 88

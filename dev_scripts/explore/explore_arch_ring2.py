@@ -4,14 +4,7 @@ Ring 2 Architecture Exploration: Use Cases (Application Business Rules)
 Application workflows that orchestrate domain entities and services
 """
 
-import sys
-import os
-from pathlib import Path
 from typing import Dict, Any
-
-# Add project root to Python path so we can import backend from anywhere
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
 
 # Import from backend package
 from backend.domain.entities.talk import Talk, TalkType
