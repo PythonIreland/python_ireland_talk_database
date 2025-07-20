@@ -72,7 +72,7 @@ async def search_talks(
 
 @router.post("/ingest")
 async def ingest_all_data(talk_service: TalkService = Depends(get_talk_service)):
-    """Ingest data from all sources"""
+    """Ingest data from all sources (full reload)"""
     try:
         from lib.engine.data_pipeline import DataPipeline
 
@@ -93,6 +93,93 @@ async def ingest_all_data(talk_service: TalkService = Depends(get_talk_service))
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+
+
+@router.post("/sync")
+async def sync_incremental_data(talk_service: TalkService = Depends(get_talk_service)):
+    """Sync only new and updated talks from all sources"""
+    try:
+        from lib.engine.data_pipeline import DataPipeline
+
+        # Initialize database if needed
+        talk_service.init_database()
+
+        # Initialize default taxonomies if needed
+        talk_service.initialize_default_taxonomies()
+
+        pipeline = DataPipeline(talk_service=talk_service)
+        results = pipeline.sync_incremental_data()
+
+        # Ensure all values are integers, not None
+        safe_results = {
+            "new_meetup": results.get("new_meetup", 0) or 0,
+            "updated_meetup": results.get("updated_meetup", 0) or 0,
+            "new_sessionize": results.get("new_sessionize", 0) or 0,
+            "updated_sessionize": results.get("updated_sessionize", 0) or 0,
+            "errors": results.get("errors", 0) or 0
+        }
+
+        total_processed = (safe_results["new_meetup"] + safe_results["updated_meetup"] + 
+                         safe_results["new_sessionize"] + safe_results["updated_sessionize"])
+
+        return {
+            "message": "Incremental sync completed successfully",
+            "results": safe_results,
+            "total_processed": total_processed,
+            "errors": safe_results["errors"]
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
+
+@router.get("/sync/status")
+async def get_sync_status(talk_service: TalkService = Depends(get_talk_service)):
+    """Get synchronization status for all data sources"""
+    try:
+        sync_statuses = talk_service.get_all_sync_statuses()
+        
+        # Add some summary statistics
+        total_talks = talk_service.get_talk_count()
+        
+        return {
+            "sync_statuses": sync_statuses,
+            "summary": {
+                "total_talks": total_talks,
+                "total_sources": len(sync_statuses),
+                "last_activity": max(
+                    [s.get("last_sync_time") for s in sync_statuses if s.get("last_sync_time")] + [""]
+                )
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get sync status: {str(e)}")
+
+
+@router.get("/sync/status/{source_type}")
+async def get_source_sync_status(
+    source_type: str, 
+    talk_service: TalkService = Depends(get_talk_service)
+):
+    """Get synchronization status for a specific data source"""
+    try:
+        sync_status = talk_service.get_sync_status(source_type)
+        
+        if not sync_status:
+            return {
+                "source_type": source_type,
+                "message": "No sync history found for this source",
+                "sync_status": None
+            }
+        
+        return {
+            "source_type": source_type,
+            "sync_status": sync_status
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get sync status: {str(e)}")
 
 
 @router.get("/health")

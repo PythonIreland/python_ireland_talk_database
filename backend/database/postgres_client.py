@@ -737,3 +737,135 @@ class PostgresClient:
             except SQLAlchemyError as e:
                 logger.error(f"Failed to perform advanced search: {e}")
                 return [], 0
+
+    def upsert_talk(self, talk_data: Dict[str, Any]) -> Optional[str]:
+        """Insert or update a talk, returns the talk ID"""
+        try:
+            with self.SessionLocal() as session:
+                # Try to find existing talk by source_id and source_type
+                existing_talk = session.query(Talk).filter(
+                    Talk.source_id == talk_data.get("source_id"),
+                    Talk.source_type == talk_data.get("source_type")
+                ).first()
+                
+                if existing_talk:
+                    # Update existing talk
+                    for key, value in talk_data.items():
+                        if key != "id":  # Don't update the primary key
+                            setattr(existing_talk, key, value)
+                    existing_talk.updated_at = datetime.utcnow()
+                    existing_talk.last_synced = datetime.utcnow()
+                    session.commit()
+                    session.refresh(existing_talk)
+                    return existing_talk.id
+                else:
+                    # Create new talk
+                    talk = Talk(**talk_data)
+                    talk.last_synced = datetime.utcnow()
+                    session.add(talk)
+                    session.commit()
+                    session.refresh(talk)
+                    return talk.id
+                    
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to upsert talk: {e}")
+            return None
+
+    def get_talk_by_source(self, source_id: str, source_type: str) -> Optional[Dict[str, Any]]:
+        """Get a talk by source_id and source_type"""
+        try:
+            with self.SessionLocal() as session:
+                talk = session.query(Talk).filter(
+                    Talk.source_id == source_id,
+                    Talk.source_type == source_type
+                ).first()
+                
+                return talk.to_dict() if talk else None
+                
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to get talk by source: {e}")
+            return None
+
+    def get_sync_status(self, source_type: str) -> Optional[Dict[str, Any]]:
+        """Get sync status for a specific source type"""
+        try:
+            with self.SessionLocal() as session:
+                from .models import SyncStatus
+                sync_status = session.query(SyncStatus).filter(
+                    SyncStatus.source_type == source_type
+                ).first()
+                
+                return sync_status.to_dict() if sync_status else None
+                
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to get sync status: {e}")
+            return None
+
+    def update_sync_status(self, source_type: str, success: bool = True, error_message: str = None) -> bool:
+        """Update sync status for a source type"""
+        try:
+            with self.SessionLocal() as session:
+                from .models import SyncStatus
+                sync_status = session.query(SyncStatus).filter(
+                    SyncStatus.source_type == source_type
+                ).first()
+                
+                if not sync_status:
+                    # Create new sync status
+                    sync_status = SyncStatus(
+                        source_type=source_type,
+                        sync_count=0,
+                        error_count=0
+                    )
+                    session.add(sync_status)
+                
+                # Update sync info
+                sync_status.last_sync_time = datetime.utcnow()
+                # Ensure sync_count is not None before incrementing
+                if sync_status.sync_count is None:
+                    sync_status.sync_count = 0
+                sync_status.sync_count += 1
+                
+                if success:
+                    sync_status.last_successful_sync = datetime.utcnow()
+                    sync_status.last_error = None
+                else:
+                    # Ensure error_count is not None before incrementing
+                    if sync_status.error_count is None:
+                        sync_status.error_count = 0
+                    sync_status.error_count += 1
+                    sync_status.last_error = error_message
+                
+                session.commit()
+                return True
+                
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to update sync status: {e}")
+            return False
+
+    def get_all_sync_statuses(self) -> List[Dict[str, Any]]:
+        """Get sync status for all source types"""
+        try:
+            with self.SessionLocal() as session:
+                from .models import SyncStatus
+                statuses = session.query(SyncStatus).all()
+                return [status.to_dict() for status in statuses]
+                
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to get all sync statuses: {e}")
+            return []
+
+    def get_talks_needing_sync(self, source_type: str, since_datetime: Optional[datetime] = None) -> List[str]:
+        """Get talk IDs that might need syncing based on last_synced timestamp"""
+        try:
+            with self.SessionLocal() as session:
+                query = session.query(Talk.id).filter(Talk.source_type == source_type)
+                
+                if since_datetime:
+                    query = query.filter(Talk.last_synced < since_datetime)
+                
+                return [row[0] for row in query.all()]
+                
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to get talks needing sync: {e}")
+            return []

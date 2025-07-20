@@ -48,6 +48,12 @@ class Talk(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Sync tracking fields for incremental updates
+    source_id = Column(String, nullable=True)  # Original ID from source (e.g., "260082480" for meetup)
+    source_type = Column(String, nullable=True)  # 'meetup', 'sessionize', 'youtube', etc.
+    last_synced = Column(DateTime, default=datetime.utcnow)  # When this record was last synced
+    source_updated_at = Column(DateTime, nullable=True)  # When source data was last updated
+
     # Extensible JSON field for type-specific data
     type_specific_data = Column(JSONB, default=dict)  # Dict[str, Any]
 
@@ -80,6 +86,10 @@ class Talk(Base):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "auto_tags": self.auto_tags or [],
             "manual_tags": self.manual_tags,
+            "source_id": self.source_id,
+            "source_type": self.source_type,
+            "last_synced": self.last_synced.isoformat() if self.last_synced else None,
+            "source_updated_at": self.source_updated_at.isoformat() if self.source_updated_at else None,
         }
 
         # Merge type-specific data
@@ -145,4 +155,33 @@ class TaxonomyValue(Base):
             "color": self.color,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "talk_count": len(self.talks),
+        }
+
+
+class SyncStatus(Base):
+    """Track synchronization status for different data sources"""
+
+    __tablename__ = "sync_status"
+
+    id = Column(Integer, primary_key=True)
+    source_type = Column(String, unique=True, nullable=False)  # 'meetup', 'sessionize', etc.
+    last_sync_time = Column(DateTime, nullable=True)  # When we last synced this source
+    last_successful_sync = Column(DateTime, nullable=True)  # Last successful sync
+    sync_count = Column(Integer, default=0)  # Total number of syncs performed
+    error_count = Column(Integer, default=0)  # Number of failed syncs
+    last_error = Column(Text, nullable=True)  # Last error message
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "source_type": self.source_type,
+            "last_sync_time": self.last_sync_time.isoformat() if self.last_sync_time else None,
+            "last_successful_sync": self.last_successful_sync.isoformat() if self.last_successful_sync else None,
+            "sync_count": self.sync_count,
+            "error_count": self.error_count,
+            "last_error": self.last_error,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
