@@ -147,6 +147,8 @@ curl "http://localhost:8000/api/v1/talks/taxonomies"
 
 ## 🏗️ Architecture
 
+The system follows Clean Architecture principles with clear separation between business logic and implementation details.
+
 ```mermaid
 flowchart LR
   A["Data Sources<br/>(Meetup, Sessionize)"]
@@ -164,39 +166,19 @@ flowchart LR
   B --> E
 ```
 
-### Clean Architecture
+**📐 Detailed Architecture:** See [ARCHITECTURE.md](ARCHITECTURE.md) for comprehensive architectural documentation, including:
 
-The codebase follows Clean Architecture principles with clear separation of concerns:
-
-**Layers:**
-
-- **Enterprise Business Rules** (`lib/engine/`): Core domain logic for data processing and talk analysis
-- **Application Business Rules** (`backend/domain/`, `backend/services/`): Use cases and domain models
-- **Interface Adapters** (`backend/api/`, `backend/database/`): Controllers, presenters, and data access
-- **Frameworks & Drivers** (`frontend/`): UI frameworks, databases, and external services
-
-**Key Components:**
-
-- **Domain Models** (`backend/domain/models.py`): Pydantic models representing business entities
-- **Database Models** (`backend/database/models.py`): SQLAlchemy models with PostgreSQL-specific implementations
-- **Services** (`backend/services/`): Application use cases and business logic orchestration
-- **API Layer** (`backend/api/`): HTTP endpoints and request/response handling
-
-**Directory Structure:**
-
-```
-lib/engine/           # Enterprise Business Rules: Core domain logic
-backend/domain/       # Application Business Rules: Domain models
-backend/services/     # Application Business Rules: Use cases
-backend/database/     # Interface Adapters: Data persistence
-backend/api/          # Interface Adapters: HTTP interface
-frontend/             # Frameworks & Drivers: User interface
-```
+- Clean Architecture layer breakdown
+- Component responsibilities
+- Data flow patterns
+- Testing strategies
+- Extension points
 
 ---
 
 ## 📚 Documentation
 
+- **[Architecture Guide](ARCHITECTURE.md):** Comprehensive architectural documentation with Clean Architecture analysis
 - **[Migration Guide](MIGRATION.md):** Detailed documentation of the Elasticsearch → PostgreSQL migration
 - **[API Documentation](http://localhost:8000/docs):** Interactive API docs (when backend is running)
 - **[Frontend README](frontend/README.md):** Frontend-specific setup and development notes

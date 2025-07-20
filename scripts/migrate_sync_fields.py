@@ -37,11 +37,11 @@ def main():
 
     # Run migration
     print("🔧 Adding sync tracking fields...")
-    
+
     try:
         # Get database engine
         engine = talk_service.db.engine
-        
+
         with engine.connect() as conn:
             # Add new columns to talks table
             print("   Adding source_id column...")
@@ -52,7 +52,7 @@ def main():
                     print("   ✓ source_id column already exists")
                 else:
                     raise e
-            
+
             print("   Adding source_type column...")
             try:
                 conn.execute(text("ALTER TABLE talks ADD COLUMN source_type VARCHAR"))
@@ -61,7 +61,7 @@ def main():
                     print("   ✓ source_type column already exists")
                 else:
                     raise e
-            
+
             print("   Adding last_synced column...")
             try:
                 conn.execute(text("ALTER TABLE talks ADD COLUMN last_synced TIMESTAMP"))
@@ -70,20 +70,24 @@ def main():
                     print("   ✓ last_synced column already exists")
                 else:
                     raise e
-            
+
             print("   Adding source_updated_at column...")
             try:
-                conn.execute(text("ALTER TABLE talks ADD COLUMN source_updated_at TIMESTAMP"))
+                conn.execute(
+                    text("ALTER TABLE talks ADD COLUMN source_updated_at TIMESTAMP")
+                )
             except Exception as e:
                 if "already exists" in str(e):
                     print("   ✓ source_updated_at column already exists")
                 else:
                     raise e
-            
+
             # Create sync_status table
             print("   Creating sync_status table...")
             try:
-                conn.execute(text("""
+                conn.execute(
+                    text(
+                        """
                     CREATE TABLE IF NOT EXISTS sync_status (
                         id SERIAL PRIMARY KEY,
                         source_type VARCHAR UNIQUE NOT NULL,
@@ -95,75 +99,97 @@ def main():
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW()
                     )
-                """))
+                """
+                    )
+                )
                 print("   ✓ sync_status table created")
             except Exception as e:
                 print(f"   ⚠️  sync_status table creation: {e}")
-            
+
             # Add indexes for performance
             print("   Adding performance indexes...")
             try:
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_talks_source ON talks(source_id, source_type)"))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_talks_sync ON talks(last_synced)"))
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_talks_source ON talks(source_id, source_type)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_talks_sync ON talks(last_synced)"
+                    )
+                )
                 print("   ✓ Indexes created")
             except Exception as e:
                 print(f"   ⚠️  Index creation: {e}")
-            
+
             # Commit changes
             conn.commit()
-        
+
         # Populate sync tracking fields for existing data
         print("🔄 Populating sync fields for existing talks...")
-        
+
         with engine.connect() as conn:
             # Update existing meetup talks
-            result = conn.execute(text("""
+            result = conn.execute(
+                text(
+                    """
                 UPDATE talks 
                 SET source_id = SUBSTRING(id FROM 'meetup_(.*)'),
                     source_type = 'meetup',
                     last_synced = created_at
                 WHERE id LIKE 'meetup_%' AND source_id IS NULL
-            """))
+            """
+                )
+            )
             print(f"   ✓ Updated {result.rowcount} meetup talks")
-            
-            # Update existing pycon talks  
-            result = conn.execute(text("""
+
+            # Update existing pycon talks
+            result = conn.execute(
+                text(
+                    """
                 UPDATE talks 
                 SET source_id = SUBSTRING(id FROM 'pycon_(.*)'),
                     source_type = 'sessionize', 
                     last_synced = created_at
                 WHERE id LIKE 'pycon_%' AND source_id IS NULL
-            """))
+            """
+                )
+            )
             print(f"   ✓ Updated {result.rowcount} pycon talks")
-            
+
             # Update test migration talk
-            result = conn.execute(text("""
+            result = conn.execute(
+                text(
+                    """
                 UPDATE talks 
                 SET source_id = 'test_migration_talk',
                     source_type = 'manual',
                     last_synced = created_at  
                 WHERE id = 'test_migration_talk' AND source_id IS NULL
-            """))
+            """
+                )
+            )
             print(f"   ✓ Updated {result.rowcount} test talks")
-            
+
             conn.commit()
 
         print("✅ Migration completed successfully!")
-        
+
         # Show summary
         print("\n📊 Migration Summary:")
         print("   ✓ Added source_id column")
-        print("   ✓ Added source_type column") 
+        print("   ✓ Added source_type column")
         print("   ✓ Added last_synced column")
         print("   ✓ Added source_updated_at column")
         print("   ✓ Created sync_status table")
         print("   ✓ Added performance indexes")
         print("   ✓ Populated existing data")
-        
+
         # Get counts
         count = talk_service.get_talk_count()
         print(f"\n📈 Total talks in database: {count}")
-        
+
         print("\n🎉 Database migration completed successfully!")
         print("💡 You can now use the new sync endpoints:")
         print("   - POST /api/v1/talks/sync (incremental sync)")

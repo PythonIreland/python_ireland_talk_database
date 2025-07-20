@@ -103,11 +103,21 @@ class TalkService:
         # Type-specific data - everything else goes here
         type_specific_data = {}
         excluded_keys = {
-            "id", "talk_type", "title", "description", "speaker_names", 
-            "auto_tags", "created_at", "updated_at", "source_id", 
-            "source_type", "last_synced", "source_updated_at", "type_specific_data"
+            "id",
+            "talk_type",
+            "title",
+            "description",
+            "speaker_names",
+            "auto_tags",
+            "created_at",
+            "updated_at",
+            "source_id",
+            "source_type",
+            "last_synced",
+            "source_updated_at",
+            "type_specific_data",
         }
-        
+
         for key, value in talk_data.items():
             if key not in excluded_keys:
                 type_specific_data[key] = value
@@ -350,15 +360,17 @@ class TalkService:
         """Get sync status for all sources"""
         return self.db.get_all_sync_statuses()
 
-    def update_sync_status(self, source_type: str, success: bool = True, error_message: str = None) -> bool:
+    def update_sync_status(
+        self, source_type: str, success: bool = True, error_message: str = None
+    ) -> bool:
         """Update sync status for a source"""
         return self.db.update_sync_status(source_type, success, error_message)
 
     def get_last_sync_time(self, source_type: str) -> Optional[str]:
         """Get last sync time for a source type"""
         sync_status = self.db.get_sync_status(source_type)
-        if sync_status and sync_status.get('last_sync_time'):
-            return sync_status['last_sync_time']
+        if sync_status and sync_status.get("last_sync_time"):
+            return sync_status["last_sync_time"]
         return None
 
     def upsert_talk(self, talk_data: Dict[str, Any]) -> str:
@@ -367,7 +379,9 @@ class TalkService:
         postgres_data = self._convert_to_postgres_format(talk_data)
         return self.db.upsert_talk(postgres_data)
 
-    def get_talk_by_source(self, source_id: str, source_type: str) -> Optional[Dict[str, Any]]:
+    def get_talk_by_source(
+        self, source_id: str, source_type: str
+    ) -> Optional[Dict[str, Any]]:
         """Get talk by source ID and type"""
         return self.db.get_talk_by_source(source_id, source_type)
 
@@ -375,10 +389,13 @@ class TalkService:
         """Check if talk exists by source ID and type"""
         return self.db.get_talk_by_source(source_id, source_type) is not None
 
-    def get_talks_needing_sync(self, source_type: str, since_datetime: Optional[str] = None) -> List[str]:
+    def get_talks_needing_sync(
+        self, source_type: str, since_datetime: Optional[str] = None
+    ) -> List[str]:
         """Get talk IDs that might need syncing"""
         from datetime import datetime
+
         since_dt = None
         if since_datetime:
-            since_dt = datetime.fromisoformat(since_datetime.replace('Z', '+00:00'))
+            since_dt = datetime.fromisoformat(since_datetime.replace("Z", "+00:00"))
         return self.db.get_talks_needing_sync(source_type, since_dt)
