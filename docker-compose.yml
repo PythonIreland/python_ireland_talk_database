@@ -1,15 +1,6 @@
 version: '3.8'
-services:
-  nginx:
-    image: nginx:1.21
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-    ports:
-      - 8000:80
-    depends_on:
-      - backend
-      - frontend
 
+services:
   postgres:
     image: postgres:15
     restart: always
@@ -31,9 +22,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: uvicorn backend.run:app --host 0.0.0.0 --port 8000 --reload
     ports:
-      - "8001:8000"
+      - "8000:8000"
     volumes:
       - ./backend:/app/backend:cached
       - ./lib:/app/lib:cached
@@ -51,13 +41,15 @@ services:
       context: frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
-    stdin_open: true
+      - "5173:5173"
     volumes:
       - './frontend:/app:cached'
-      - './frontend/node_modules:/app/node_modules:cached'
+      - '/app/node_modules'  # Anonymous volume for node_modules
     environment:
       - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

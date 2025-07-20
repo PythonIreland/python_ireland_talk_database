@@ -115,41 +115,33 @@ curl "http://localhost:8000/api/v1/talks/taxonomies"
 
 ---
 
-## 🎯 Project Vision & Roadmap
+## 🎯 Project Status & Roadmap
 
-This project aims to become a comprehensive "intelligence platform" for Python Ireland, built in iterative phases:
+### Phase 1: Talk Content Explorer ✅
 
-### Phase A: Talk Content Explorer ✅
+- **Status:** Complete
+- **Features:** Search, filter, and browse conference talks and meetup events
+- **Data Sources:** Sessionize API (PyCon events) and Meetup API
+- **Interface:** React-based explorer with detail views
 
-- **Current Status:** Complete with PostgreSQL migration
-- **Features:** Search, filter, and tag conference talks and meetup events
-- **Data Sources:** Sessionize (PyCon events) and Meetup API
-- **Interface:** React-based Talk Explorer with detail drawers
+### Phase 2: Taxonomy System ✅
 
-### Phase B: Taxonomy Manager 🚧
+- **Status:** Complete
+- **Features:** Structured tag management with custom taxonomies
+- **Implementation:** Multi-taxonomy support, colored tags, CRUD operations
+- **Interface:** Management UI for taxonomies and values
 
-- **Goal:** Structured tag management and hierarchy
-- **Features:**
-  - User-defined taxonomies with custom values
-  - Tag metadata (colors, descriptions)
-  - Multiple taxonomy support per talk
-  - Drag-and-drop taxonomy builder
+### Phase 3: Analytics Dashboard 📋
 
-### Phase C: Analytics Dashboard 📋
+- **Status:** Planned
+- **Features:** Tag distribution charts, usage trends, data export
+- **Implementation:** Visualization components and reporting
 
-- **Goal:** Data visualization and insights
-- **Features:**
-  - Tag distribution charts
-  - Trends over time
-  - Co-occurrence analysis
-  - CSV/JSON export capabilities
+### Future Phases �
 
-### Future Vision 🚀
-
-- **LLM Integration:** Q&A interface for talk content
-- **Video Processing:** Automated transcription and tagging
-- **Community Portal:** Speaker profiles, event management
-- **Multi-Community:** Template for other Python communities
+- **LLM Integration:** Natural language query interface
+- **Video Processing:** Automated transcription and content analysis
+- **Community Features:** Speaker profiles and event management
 
 ---
 
@@ -166,41 +158,40 @@ flowchart LR
 
   subgraph "Future"
     E["Vector DB<br/>(Embeddings)"]
-    F["LLM Services<br/>(Q&A)"]
     E --> F
   end
 
   B --> E
 ```
 
-### Hexagonal Architecture (Ports & Adapters)
+### Clean Architecture
 
-Following the **Hexagonal Architecture** pattern by Alistair Cockburn:
+The codebase follows Clean Architecture principles with clear separation of concerns:
 
-- **Ring 1 - Core Domain:** Pure business logic (`lib/engine/`) - No external dependencies
-- **Ring 2 - Application Layer:** Use cases, orchestration, and domain models (`backend/services/`, `backend/domain/`)
-- **Ring 3 - Infrastructure:** Technical adapters (`backend/database/`, `backend/api/`, `frontend/`)
+**Layers:**
 
-**Key Architectural Distinctions:**
+- **Enterprise Business Rules** (`lib/engine/`): Core domain logic for data processing and talk analysis
+- **Application Business Rules** (`backend/domain/`, `backend/services/`): Use cases and domain models
+- **Interface Adapters** (`backend/api/`, `backend/database/`): Controllers, presenters, and data access
+- **Frameworks & Drivers** (`frontend/`): UI frameworks, databases, and external services
 
-- **Domain Models** (`backend/domain/models.py`): Pydantic models representing business entities - technology agnostic
-- **Database Models** (`backend/database/models.py`): SQLAlchemy models with PostgreSQL-specific features (JSONB, etc.)
-- **Database Logic** (how to search) is Ring 2, **Database Implementation** (PostgreSQL specifics) is Ring 3
+**Key Components:**
 
-**Benefits:** Highly testable, technology-agnostic core, easy to swap external dependencies.
+- **Domain Models** (`backend/domain/models.py`): Pydantic models representing business entities
+- **Database Models** (`backend/database/models.py`): SQLAlchemy models with PostgreSQL-specific implementations
+- **Services** (`backend/services/`): Application use cases and business logic orchestration
+- **API Layer** (`backend/api/`): HTTP endpoints and request/response handling
 
-**Directory Structure by Architectural Ring:**
+**Directory Structure:**
 
 ```
-lib/engine/           # Ring 1: Pure business logic (data processing, tagging)
-backend/domain/       # Ring 2: Domain models and business entities
-backend/services/     # Ring 2: Application orchestration and use cases
-backend/database/     # Ring 3: Database persistence and PostgreSQL specifics
-backend/api/          # Ring 3: HTTP adapters and REST endpoints
-frontend/             # Ring 3: User interface adapters
+lib/engine/           # Enterprise Business Rules: Core domain logic
+backend/domain/       # Application Business Rules: Domain models
+backend/services/     # Application Business Rules: Use cases
+backend/database/     # Interface Adapters: Data persistence
+backend/api/          # Interface Adapters: HTTP interface
+frontend/             # Frameworks & Drivers: User interface
 ```
-
-**Further Reading:** [Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/) by Alistair Cockburn
 
 ---
 
