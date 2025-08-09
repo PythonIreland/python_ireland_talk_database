@@ -1,0 +1,2 @@
+Generic single-database configuration for Alembic.
+Run `pipenv run alembic revision --autogenerate -m "initial"` then `pipenv run alembic upgrade head`.
