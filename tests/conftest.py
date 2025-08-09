@@ -1,87 +1,50 @@
-# tests/conftest.py
-"""
-Shared test configuration and fixtures
-"""
-import pytest
 import os
-import subprocess
-import time
-import socket
-from backend.database.postgres_client import PostgresClient
+import sys
+import tempfile
+import pytest
+from sqlalchemy import text
+
+# Add project root to sys.path so 'backend' and 'lib' can be imported in tests
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 
-def _is_port_open(host: str, port: int) -> bool:
-    """Check if a port is open"""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(1)
-        result = sock.connect_ex((host, port))
-        return result == 0
+def pytest_sessionstart(session):
+    """Configure an isolated SQLite DB for the whole test session before imports."""
+    tmpdir = tempfile.mkdtemp(prefix="talkdb_tests_")
+    db_path = os.path.join(tmpdir, "app_test.db")
+    os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
+    # Disable outbound network for ingestion to keep tests deterministic
+    os.environ["INGEST_DISABLE_NETWORK"] = "1"
 
 
-@pytest.fixture(scope="session")
-def test_database_url():
-    """Get the test database URL from environment or use default"""
-    return os.getenv(
-        "TEST_DATABASE_URL",
-        "postgresql://postgres:testpass@localhost:5433/talks_test_db",
-    )
+@pytest.fixture(autouse=True)
+def clean_db():
+    """Ensure a clean DB before each test (on the test database)."""
+    # Import here to ensure engine binds to DATABASE_URL set above
+    from backend.db.engine import get_engine, init_db  # noqa: WPS433
 
-
-@pytest.fixture(scope="session")
-def ensure_test_db():
-    """Ensure test PostgreSQL database is running"""
-    # Check if database is already running
-    if _is_port_open("localhost", 5433):
-        print("Test database already running")
-        yield
-        return
-
-    print("Starting test database...")
-
-    # Start the test database
-    try:
-        subprocess.run(
-            ["docker-compose", "-f", "docker-compose.test.yml", "up", "-d", "--wait"],
-            check=True,
-            cwd="/home/jcurry/repos/python_ireland_talk_database",
-        )
-
-        # Wait for PostgreSQL to be ready
-        max_retries = 30
-        for i in range(max_retries):
-            if _is_port_open("localhost", 5433):
-                time.sleep(2)  # Extra time for PostgreSQL to fully initialize
-                break
-            time.sleep(1)
-        else:
-            raise RuntimeError("Test database failed to start")
-
-        print("Test database ready")
-        yield
-
-    finally:
-        # Clean up: stop the test database
-        print("Stopping test database...")
-        subprocess.run(
-            ["docker-compose", "-f", "docker-compose.test.yml", "down", "-v"],
-            cwd="/home/jcurry/repos/python_ireland_talk_database",
-        )
-
-
-@pytest.fixture
-def postgres_client(test_database_url, ensure_test_db):
-    """Create a PostgresClient with test PostgreSQL database"""
-    client = PostgresClient(connection_string=test_database_url)
-
-    # Initialize database tables and indexes
-    client.init_database()
-
-    # Clean slate before each test
-    client.delete_all_talks()
-    client.delete_all_taxonomies()
-
-    yield client
-
-    # Clean up after each test
-    client.delete_all_talks()
-    client.delete_all_taxonomies()
+    init_db()
+    engine = get_engine()
+    with engine.begin() as conn:
+        try:
+            conn.exec_driver_sql("PRAGMA foreign_keys = OFF")
+        except Exception:
+            pass
+        for table in (
+            "talk_taxonomy_values",
+            "taxonomy_values",
+            "taxonomies",
+            "talks",
+            "sync_status",
+        ):
+            try:
+                conn.execute(text(f"DELETE FROM {table}"))
+            except Exception:
+                pass
+        try:
+            conn.exec_driver_sql("PRAGMA foreign_keys = ON")
+        except Exception:
+            pass
+    yield
