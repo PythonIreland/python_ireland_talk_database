@@ -1,184 +1,99 @@
 # Python Ireland Talk Database
 
-A searchable database of Python Ireland conference talks and meetup events with intelligent tagging and filtering capabilities.
-
-**🚀 Latest:** Migrated to PostgreSQL for enhanced tagging and simpler deployment!
+A searchable database of Python Ireland conference talks and meetup events with tagging, taxonomies, search (including Postgres FTS), and simple analytics.
 
 ---
 
-## 🚀 Quick Start
+## New Contributors Start Here
 
-Choose your preferred setup method:
+Prerequisites:
 
-### Option 1: Full Docker (Recommended)
+- Python 3.11+
+- Pipenv: `pip install pipenv`
+- Node.js 20+ (for the frontend, optional)
+- PostgreSQL (optional; SQLite works by default)
 
-**Perfect for:** First-time users, demos, consistent environments
+Quick start (SQLite by default):
 
-```bash
-# Start everything with one command
-docker-compose up
+- Install deps: `pipenv install --dev`
+- Run API: `make dev` (http://localhost:8000, docs at /docs)
+- Run tests: `make test`
+- Ingest sample data (with API running): `make ingest`
+- Start frontend (optional): `make frontend` (http://localhost:5173)
 
-# Visit the app at http://localhost:8000
-# API docs at http://localhost:8000/docs
-```
+Using Postgres instead of SQLite:
 
-### Option 2: Local Development + Docker Database
-
-**Perfect for:** Active development, faster iteration
-
-```bash
-# 1. Start just the database
-docker-compose up postgres -d
-
-# 2. Setup backend
-pipenv install --dev && pipenv shell
-python scripts/init_postgres.py
-python -m backend.run
-
-# 3. Setup frontend (new terminal)
-cd frontend && npm install && npm run dev
-
-# Backend: http://localhost:8000
-# Frontend: http://localhost:5173
-```
-
-### Option 3: Manual Setup
-
-**Perfect for:** Custom configurations, production deployments
-
-Prerequisites: PostgreSQL, Python 3.11+, Node.js 20+
-
-```bash
-# Create database
-createdb talks_db
-
-# Configure environment
-export DATABASE_URL="postgresql://localhost/talks_db"
-
-# Follow Option 2 steps 2-3 above
-```
+- Export: `export DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/pyireland`
+- Migrate: `make migrate`
+- Run API: `make dev`
 
 ---
 
-## 🎯 Load Sample Data
+## Developer Commands (Makefile)
 
-After starting the backend:
-
-```bash
-# Load talks from conferences and meetups
-curl -X POST http://localhost:8000/api/v1/talks/ingest
-
-# Verify data loaded
-curl http://localhost:8000/api/v1/talks/search
-```
+- `make dev` → Start FastAPI on http://localhost:8000
+- `make test` → Run pytest (-q)
+- `make migrate` → Alembic upgrade head (uses DATABASE_URL if set)
+- `make ingest` → POST /api/v1/ingest/full then pretty-print result
+- `make frontend` → Start Vite dev server (http://localhost:5173)
 
 ---
 
-## 🛠 Technology Stack
+## API Highlights
 
-**Backend:** FastAPI, PostgreSQL, Python 3.11  
-**Frontend:** React, Vite, Material-UI, TypeScript  
-**Data Sources:** Sessionize (PyCon events), Meetup API
+- Talks search: `GET /api/v1/talks/search?q=&talk_types=&tags=&limit=&offset=` → `{ talks, total }`
+- Advanced search: `GET /api/v1/talks/search/advanced?query=...&taxonomy_<Name>=Value`
+- Talk detail via id: prefix: `GET /api/v1/talks/search?q=id:<talk_id>`
+- Talk types: `GET /api/v1/talks/types`
+- Taxonomies: CRUD under `/api/v1/talks/taxonomies` and `/api/v1/talks/taxonomy-values/*`
+- Tagging on talks: `GET/POST/PUT/DELETE /api/v1/talks/{id}/tags*`
+- Analytics: `/api/v1/talks/analytics/*` (popular tags, taxonomy usage)
+- Ingestion: `POST /api/v1/ingest/full`, `POST /api/v1/ingest/sync`, `GET /api/v1/ingest/status`
 
----
-
-## 🧪 Running Tests
-
-```bash
-# Run all tests (starts test database automatically)
-pipenv run pytest
-
-# Run specific test suites
-pipenv run pytest tests/test_ring1.py -v        # Business logic
-pipenv run pytest tests/test_postgres_client.py -v  # Database layer
-```
+Full interactive docs at `/docs`.
 
 ---
 
-## � API Usage
+## Storage
 
-### Search Examples
-
-```bash
-# Search talks by keyword
-curl "http://localhost:8000/api/v1/talks/search?q=django"
-
-# Filter by talk type and tags
-curl "http://localhost:8000/api/v1/talks/search?talk_types=pycon&tags=web"
-
-# Get available events and taxonomies
-curl "http://localhost:8000/api/v1/talks/events"
-curl "http://localhost:8000/api/v1/talks/taxonomies"
-```
-
-**📚 Full API Documentation:** http://localhost:8000/docs
+- Default: SQLite file `app.db` with zero config
+- Postgres: set `DATABASE_URL` and run `make migrate`
+- Search uses Postgres FTS (`to_tsvector`) when on PG; falls back to LIKE on SQLite
 
 ---
 
-## 🎯 Project Status & Roadmap
+## Logging & Error Handling
 
-### Phase 1: Talk Content Explorer ✅
+- Structured request logs with latency and status
+- `X-Request-ID` is generated if missing and returned in responses
+- Set log level via `LOG_LEVEL` (INFO by default)
 
-- **Status:** Complete
-- **Features:** Search, filter, and browse conference talks and meetup events
-- **Data Sources:** Sessionize API (PyCon events) and Meetup API
-- **Interface:** React-based explorer with detail views
+Example env:
 
-### Phase 2: Taxonomy System ✅
-
-- **Status:** Complete
-- **Features:** Structured tag management with custom taxonomies
-- **Implementation:** Multi-taxonomy support, colored tags, CRUD operations
-- **Interface:** Management UI for taxonomies and values
-
-### Phase 3: Analytics Dashboard 📋
-
-- **Status:** Planned
-- **Features:** Tag distribution charts, usage trends, data export
-- **Implementation:** Visualization components and reporting
-
-### Future Phases �
-
-- **LLM Integration:** Natural language query interface
-- **Video Processing:** Automated transcription and content analysis
-- **Community Features:** Speaker profiles and event management
+- `export LOG_LEVEL=DEBUG`
 
 ---
 
-## 🏗️ Architecture
+## Frontend
 
-The system follows Clean Architecture principles with clear separation between business logic and implementation details.
+The Vite/React frontend lives in `frontend/`.
 
-```mermaid
-flowchart LR
-  A["Data Sources<br/>(Meetup, Sessionize)"]
-  B["PostgreSQL<br/>(Storage & Search)"]
-  C["FastAPI<br/>(REST API)"]
-  D["React + Vite<br/>(Frontend)"]
-
-  A --> B --> C --> D
-
-  subgraph "Future"
-    E["Vector DB<br/>(Embeddings)"]
-    E --> F
-  end
-
-  B --> E
-```
-
-**📐 Detailed Architecture:** See [ARCHITECTURE.md](ARCHITECTURE.md) for comprehensive architectural documentation, including:
-
-- Clean Architecture layer breakdown
-- Component responsibilities
-- Data flow patterns
-- Testing strategies
-- Extension points
+- Start: `make frontend`
+- Configure API base URL in `frontend/src/config.ts` if needed (defaults to http://localhost:8000/api/v1)
 
 ---
 
-## 📚 Documentation
+## Contributing
 
-- **[Architecture Guide](ARCHITECTURE.md):** Comprehensive architectural documentation with Clean Architecture analysis
-- **[Migration Guide](MIGRATION.md):** Detailed documentation of the Elasticsearch → PostgreSQL migration
-- **[API Documentation](http://localhost:8000/docs):** Interactive API docs (when backend is running)
-- **[Frontend README](frontend/README.md):** Frontend-specific setup and development notes
+- Keep endpoints stable and response shape `{ talks, total }`
+- Prefer small PRs; include tests under `tests/`
+- SQLite used in tests; outbound network disabled in CI by env
+
+---
+
+## Postgres quickstart
+
+- Ensure Postgres is running and create a database.
+- Set `DATABASE_URL`, e.g. `export DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/pyireland`
+- Initialize schema: `make migrate`
+- Run tests: `make test`

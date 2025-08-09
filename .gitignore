@@ -2,6 +2,7 @@
 backend/venv/
 frontend/node_modules/
 frontend/.env.development
+app.db
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
