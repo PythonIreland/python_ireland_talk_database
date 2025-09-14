@@ -7,7 +7,7 @@ dev:
 
 # Run test suite
 test:
-	pipenv run pytest -q
+	pipenv run pytest
 
 # Apply database migrations (uses DATABASE_URL if set)
 migrate:
