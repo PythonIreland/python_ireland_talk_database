@@ -2,6 +2,9 @@
 
 A searchable database of Python Ireland conference talks and meetup events with tagging, taxonomies, search (including Postgres FTS), and simple analytics.
 
+For a concise project status and next steps, see the handoff guide: [HANDOFF.md](HANDOFF.md).
+For a deeper technical overview, see: [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ---
 
 ## New Contributors Start Here
