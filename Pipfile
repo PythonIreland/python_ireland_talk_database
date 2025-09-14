@@ -16,7 +16,6 @@ pydantic-settings = "*"
 passlib = {extras = ["bcrypt"], version = "*"}
 python-jose = {extras = ["cryptography"], version = "*"}
 python-multipart = "*"
-elasticsearch = "==7.17.9"
 beautifulsoup4 = "*"
 
 [dev-packages]
@@ -25,6 +24,7 @@ pytest-asyncio = "*"
 black = "*"
 isort = "*"
 flake8 = "*"
+ipykernel = "*"
 
 [requires]
 python_version = "3.11"
